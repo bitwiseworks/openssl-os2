@@ -75,6 +75,7 @@ my $W32=0;
 my $W16=0;
 my $NT=0;
 my $OS2=0;
+my $KNIX=0;
 # Set this to make typesafe STACK definitions appear in DEF
 my $safe_stack_def = 0;
 
@@ -150,7 +151,8 @@ foreach (@ARGV, split(/ /, $options))
 		$VMSNonVAX=1;
 	}
 	$VMS=1 if $_ eq "VMS";
-	$OS2=1 if $_ eq "OS2";
+	$KNIX=1 if $_ eq "OS2-KNIX";
+	$OS2=1 if ($_ eq "OS2" || $_ eq "OS2-EMX" || $_ eq "OS2-KNIX");
 	if ($_ eq "zlib" || $_ eq "enable-zlib" || $_ eq "zlib-dynamic"
 			 || $_ eq "enable-zlib-dynamic") {
 		$zlib = 1;
@@ -218,6 +220,7 @@ foreach (@ARGV, split(/ /, $options))
 	elsif (/^no-ssl2$/)	{ $no_ssl2=1; }
 	elsif (/^no-capieng$/)	{ $no_capieng=1; }
 	elsif (/^no-jpake$/)	{ $no_jpake=1; }
+	elsif (/^no-exports$/)	{ $no_exports=1; }
 	}
 
 
@@ -1258,14 +1261,30 @@ sub print_def_file
 		  # However, they should not have any particular relationship
 		  # to the name of the static library.  Chose descriptive names
 		  # (must be at most 8 chars).
-		  my %translate = (ssl => 'open_ssl', crypto => 'cryptssl');
+		  my $soname_ssl='emssl';
+		  my $soname_crypto='emcrpt';
+		  my $os2_target="OS2-EMX";
+		  my $vernum = $version;
+		  $vernum = $1 if $version =~ /([\d\.]*)/;
+		  if ($KNIX)
+		  	{
+		  	$soname_ssl='ssl';
+		  	$soname_crypto='crypto';
+		  	$os2_target="OS2-KNIX";
+		  	}
+		  if ($vernum =~ /^(\d\d*)\.(\d\d*)/)
+			{
+			$soname_crypto .= $1 . $2;
+			$soname_ssl .= $1 . $2;
+			}
+		  my %translate = (ssl => $soname_ssl, crypto => $soname_crypto);
 		  $libname = $translate{$name} || $name;
 		  $liboptions = <<EOO;
-INITINSTANCE
+INITINSTANCE TERMINSTANCE
 DATA MULTIPLE NONSHARED
 EOO
 		  # Vendor field can't contain colon, drat; so we omit http://
-		  $description = "\@#$http_vendor:$version#\@$what; DLL for library $name.  Build for EMX -Zmtd";
+		  $description = "\@#OPENSSL:$vernum#\@OpenSSL $version lib$name ($os2_target)";
 		}
 
 	print OUT <<"EOF";
@@ -1276,6 +1295,12 @@ EOO
 LIBRARY         $libname	$liboptions
 
 EOF
+	if ($OS2) {
+		print <<"EOF";
+DESCRIPTION     '$description'
+
+EOF
+	}
 
 	if ($W16) {
 		print <<"EOF";
@@ -1290,6 +1315,8 @@ STACKSIZE	8192
 EOF
 	}
 
+	if (!$no_exports)
+	{
 	print "EXPORTS\n";
 
 	(@e)=grep(/^SSLeay(\{[0-9]+\})?\\.*?:.*?:FUNCTION/,@symbols);
@@ -1318,13 +1345,16 @@ EOF
 				$prev = $s2;	# To warn about duplicates...
 				if($v && !$OS2) {
 					printf OUT "    %s%-39s @%-8d DATA\n",($W32)?"":"_",$s2,$n;
+				} elsif ($KNIX) {
+					printf OUT "    _%s\n",$s2;
 				} else {
-					printf OUT "    %s%-39s @%d\n",($W32||$OS2)?"":"_",$s2,$n;
+					printf OUT "    %s%-39s @%d\n",(($W32||$OS2)&&!$KNIX)?"":"_",$s2,$n;
 				}
 			}
 		}
 	}
 	printf OUT "\n";
+	}	# ...endif ($!no_exports);
 }
 
 sub load_numbers

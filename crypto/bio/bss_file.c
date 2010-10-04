@@ -89,6 +89,10 @@
 #include "bio_lcl.h"
 #include <openssl/err.h>
 
+#if defined(OPENSSL_SYS_OS2)
+#include <fcntl.h>
+#endif
+
 #if defined(OPENSSL_SYS_NETWARE) && defined(NETWARE_CLIB)
 #include <nwfileio.h>
 #endif

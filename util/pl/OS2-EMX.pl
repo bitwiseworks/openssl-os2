@@ -25,7 +25,7 @@ $ofile='-o ';
 
 # EXE linking stuff
 $link='${CC}';
-$lflags='${CFLAGS} -Zbsd-signals -s';
+$lflags='${CFLAGS} -s';
 $efile='-o ';
 $exep='.exe';
 $ex_libs="-lsocket";

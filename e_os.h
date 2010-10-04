@@ -628,7 +628,7 @@ static unsigned int _strlen31(const char *str)
  * versions.
  */
 #  if !defined(OPENSSL_USE_IPV6)
-#    if defined(AF_INET6) && !defined(OPENSSL_SYS_BEOS_BONE) && !defined(NETWARE_CLIB)
+#    if defined(AF_INET6) && !defined(OPENSSL_SYS_BEOS_BONE) && !defined(NETWARE_CLIB) && !defined(OPENSSL_SYS_OS2)
 #      define OPENSSL_USE_IPV6 1
 #    else
 #      define OPENSSL_USE_IPV6 0
@@ -686,21 +686,12 @@ extern char *sys_errlist[]; extern int sys_nerr;
 #  define strcasecmp OPENSSL_strcasecmp
 #  define strncasecmp OPENSSL_strncasecmp
 #  define OPENSSL_IMPLEMENTS_strncasecmp
-#elif defined(OPENSSL_SYS_OS2) && defined(__EMX__)
-#  define strcasecmp stricmp
-#  define strncasecmp strnicmp
 #elif defined(OPENSSL_SYS_NETWARE)
 #  include <string.h>
 #  if defined(NETWARE_CLIB)
 #    define strcasecmp stricmp
 #    define strncasecmp strnicmp
 #  endif /* NETWARE_CLIB */
-#endif
-
-#if defined(OPENSSL_SYS_OS2) && defined(__EMX__)
-# include <io.h>
-# include <fcntl.h>
-# define NO_SYSLOG
 #endif
 
 /* vxworks */

@@ -565,6 +565,7 @@ my %table=(
 
 ##### OS/2 EMX
 "OS2-EMX", "gcc::::::::",
+"OS2-KNIX",	"gcc: -DOPENSSL_NO_STATIC_ENGINE -DL_ENDIAN -DTERMIOS -O3 -fomit-frame-pointer -Wall:::::BN_LLONG ${x86_gcc_des} ${x86_gcc_opts}:${x86_asm}:os2-a.out::os2::-g -Zomf -Zbin-files -Zhigh-mem -Zdll:10.dll",
 
 ##### VxWorks for various targets
 "vxworks-ppc405","ccppc:-g -msoft-float -mlongcall -DCPU=PPC405 -I\$(WIND_BASE)/target/h:::VXWORKS:-r:::::",
@@ -1286,6 +1287,7 @@ if (!$IsMK1MF)
 		{
 		$openssl_other_defines.="#define OPENSSL_NO_DYNAMIC_ENGINE\n";
 		$options.=" static-engine";
+		$options.=" enable-static-engine";
 		}
 	else
 		{

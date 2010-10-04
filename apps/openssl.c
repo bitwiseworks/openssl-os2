@@ -109,6 +109,9 @@
  *
  */
 
+#if defined(__KLIBC__)
+#include <float.h>
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -228,6 +231,10 @@ int main(int Argc, char *Argv[])
 	LHASH_OF(FUNCTION) *prog=NULL;
 	long errline;
  
+#if defined(__KLIBC__)
+	_control87(MCW_EM, MCW_EM); /* OS/2: Mask all FPEs (to avoid SIGPFE on some C) */
+#endif
+
 	arg.data=NULL;
 	arg.count=0;
 

@@ -73,6 +73,7 @@ $infile="MINFO";
 	"ultrix-mips","DEC mips ultrix",
 	"FreeBSD","FreeBSD distribution",
 	"OS2-EMX", "EMX GCC OS/2",
+	"OS2-KNIX", "OS/2 - KNIX (kLIBC) with gcc",
 	"netware-clib", "CodeWarrior for NetWare - CLib - with WinSock Sockets",
 	"netware-clib-bsdsock", "CodeWarrior for NetWare - CLib - with BSD Sockets",
 	"netware-libc", "CodeWarrior for NetWare - LibC - with WinSock Sockets",
@@ -207,9 +208,18 @@ elsif ($platform eq "ultrix-mips")
 	require "ultrix.pl";
 	$unix=1;
 	}
-elsif ($platform eq "OS2-EMX")
+elsif ($platform =~ "OS2-EMX")
 	{
 	$wc=1;
+	$knix=0;
+	$asmtype='os2-a.out';
+	require 'OS2-EMX.pl';
+	}
+elsif ($platform =~ "OS2-K")
+	{
+	$wc=1;
+	$knix=1;
+	$asmtype='os2-a.out';
 	require 'OS2-EMX.pl';
 	}
 elsif (($platform eq "netware-clib") || ($platform eq "netware-libc") ||
@@ -1036,6 +1046,7 @@ sub read_options
 		"nw-nasm" => \$nw_nasm,
 		"nw-mwasm" => \$nw_mwasm,
 		"gaswin" => \$gaswin,
+		"no-sse2" => \$no_sse2,
 		"no-ssl2" => \$no_ssl2,
 		"no-ssl3" => \$no_ssl3,
 		"no-tlsext" => \$no_tlsext,

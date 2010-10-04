@@ -181,6 +181,28 @@ link_o.beos:
 link_a.beos:
 	@ $(DO_BEOS_SO); $(LINK_SO_A)
 
+$(LIBNAME).def: Makefile
+	perl util/mkdef.pl $(LIBNAME) OS2-KNIX > $(LIBNAME).def
+
+link_a.os2: $(LIBNAME).def
+	echo 'link_a.os2'
+	cp lib$(LIBNAME).a $(LIBNAME)_s.a 
+	gcc -g -Zomf -Zbin-files -Zhigh-mem -Zdll $(LIBNAME).def -o $(LIBNAME)$(SHLIB_EXT) lib$(LIBNAME).a $(LIBEXTRAS) $(LIBDEPS) 
+	emximp -o lib$(LIBNAME).a $(LIBNAME).def
+	# make rules happy
+	cp $(LIBNAME)$(SHLIB_EXT) lib$(LIBNAME)$(SHLIB_EXT)
+
+link_o.os2:
+	echo 'link_o.os2'
+	#cp lib$(LIBNAME).a $(LIBNAME)_s.a 
+	gcc -g -Zomf -Zbin-files -Zhigh-mem -Zdll -o $(LIBNAME)$(SHLIB_EXT) $(LIBEXTRAS) $(LIBDEPS) 
+	#emximp -o lib$(LIBNAME).a $(LIBNAME).def
+	# make rules happy
+	cp $(LIBNAME)$(SHLIB_EXT) lib$(LIBNAME)$(SHLIB_EXT)
+
+link_app.os2:
+	gcc -g -Zomf -Zbin-files -Zhigh-mem -Zexe $(LDFLAGS) -o $(APPNAME) $(OBJECTS) $(LIBDEPS)
+
 link_o.bsd:
 	@if $(DETECT_GNU_LD); then $(DO_GNU_SO); else \
 	$(CALC_VERSIONS); \
@@ -579,7 +601,7 @@ symlink.hpux:
 	expr $(PLATFORM) : '.*ia64' > /dev/null && SHLIB=lib$(LIBNAME).so; \
 	$(SYMLINK_SO)
 # The following lines means those specific architectures do no symlinks
-symlink.cygwin symlink.alpha-osf1 symlink.tru64 symlink.tru64-rpath symlink.beos:
+symlink.cygwin symlink.alpha-osf1 symlink.tru64 symlink.tru64-rpath symlink.beos symlink.os2:
 
 # Compatibility targets
 link_o.bsd-gcc-shared link_o.linux-shared link_o.gnu-shared: link_o.gnu
