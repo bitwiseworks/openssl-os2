@@ -1,1 +1,1 @@
-../../crypto/ui/ui.h¦
+../../crypto/ui/ui.h

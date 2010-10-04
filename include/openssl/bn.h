@@ -1,1 +1,1 @@
-../../crypto/bn/bn.hx
+../../crypto/bn/bn.h

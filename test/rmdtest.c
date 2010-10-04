@@ -1,1 +1,1 @@
-../crypto/ripemd/rmdtest.c
+../crypto/ripemd/rmdtest.c
