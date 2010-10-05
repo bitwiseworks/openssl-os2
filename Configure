@@ -565,7 +565,7 @@ my %table=(
 
 ##### OS/2 EMX
 "OS2-EMX", "gcc::::::::",
-"OS2-KNIX",	"gcc: -DOPENSSL_NO_STATIC_ENGINE -DL_ENDIAN -DTERMIOS -O3 -fomit-frame-pointer -Wall:::::BN_LLONG ${x86_gcc_des} ${x86_gcc_opts}:${x86_asm}:os2-a.out::os2::-g -Zomf -Zbin-files -Zhigh-mem -Zdll:10.dll",
+"OS2-KNIX",	"gcc: \$(CFLAGS) -DOPENSSL_NO_STATIC_ENGINE -DL_ENDIAN -DTERMIOS -fomit-frame-pointer -Wall:::::BN_LLONG ${x86_gcc_des} ${x86_gcc_opts}:${x86_asm}:os2-a.out:os2:os2::-g -Zomf -Zbin-files -Zhigh-mem -Zdll:10.dll",
 
 ##### VxWorks for various targets
 "vxworks-ppc405","ccppc:-g -msoft-float -mlongcall -DCPU=PPC405 -I\$(WIND_BASE)/target/h:::VXWORKS:-r:::::",
@@ -1037,6 +1037,7 @@ foreach (sort @experimental)
 my $IsMK1MF=scalar grep /^$target$/,@MK1MF_Builds;
 
 $exe_ext=".exe" if ($target eq "Cygwin" || $target eq "DJGPP" || $target =~ /^mingw/);
+$exe_ext=".exe" if ($target =~ /OS2/);
 $exe_ext=".nlm" if ($target =~ /netware/);
 $exe_ext=".pm"  if ($target =~ /vos/);
 $openssldir="/usr/local/ssl" if ($openssldir eq "" and $prefix eq "");
@@ -1784,6 +1785,7 @@ EOF
 	close(OUT);
 } else {
 	my $make_command = "$make PERL=\'$perl\'";
+	$make_command = "$make";
 	my $make_targets = "";
 	$make_targets .= " links" if $symlink;
 	$make_targets .= " depend" if $depflags ne $default_depflags && $make_depend;

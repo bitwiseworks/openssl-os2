@@ -117,6 +117,7 @@ install:
 				*DSO_DLFCN*)	sfx=".so";;	\
 				*DSO_DL*)	sfx=".sl";;	\
 				*DSO_WIN32*)	sfx="eay32.dll"; pfx=;;	\
+				*DSO_OS2*)	sfx="10.dll"; pfx=;; \
 				*)		sfx=".bad";;	\
 				esac; \
 				cp $$pfx$$l$$sfx $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$$pfx$$l$$sfx.new; \

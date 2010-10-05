@@ -201,7 +201,7 @@ link_o.os2:
 	cp $(LIBNAME)$(SHLIB_EXT) lib$(LIBNAME)$(SHLIB_EXT)
 
 link_app.os2:
-	gcc -g -Zomf -Zbin-files -Zhigh-mem -Zexe $(LDFLAGS) -o $(APPNAME) $(OBJECTS) $(LIBDEPS)
+	gcc -g -Zomf -Zbin-files -Zhigh-mem $(LDFLAGS) -o $(APPNAME) $(OBJECTS) $(LIBDEPS)
 
 link_o.bsd:
 	@if $(DETECT_GNU_LD); then $(DO_GNU_SO); else \
