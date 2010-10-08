@@ -65,6 +65,7 @@
 #define INCL_DOSMODULEMGR
 #include <os2.h>
 
+#define   CMD_KI_ENABLE   (0x60)
 #define   CMD_KI_RDCNT    (0x63)
 
 typedef struct _CPUUTIL {
@@ -78,34 +79,30 @@ typedef struct _CPUUTIL {
     ULONG ulIntrHigh;           /* High 32 bits of interrupt time */
 } CPUUTIL;
 
-#ifndef __KLIBC__
-APIRET APIENTRY(*DosPerfSysCall) (ULONG ulCommand, ULONG ulParm1, ULONG ulParm2, ULONG ulParm3) = NULL;
-APIRET APIENTRY(*DosQuerySysState) (ULONG func, ULONG arg1, ULONG pid, ULONG _res_, PVOID buf, ULONG bufsz) = NULL;
-#endif
-HMODULE hDoscalls = 0;
-
 int RAND_poll(void)
 {
-    char failed_module[20];
+    static int checked_to_use_dosperfsyscall = 0;
+    static int use_dosperfsyscall = 0;
+    APIRET rc;
     QWORD qwTime;
     ULONG SysVars[QSV_FOREGROUND_PROCESS];
 
-    if (hDoscalls == 0) {
-        ULONG rc = DosLoadModule(failed_module, sizeof(failed_module), "DOSCALLS", &hDoscalls);
-
-#ifndef __KLIBC__
-        if (rc == 0) {
-            rc = DosQueryProcAddr(hDoscalls, 976, NULL, (PFN *)&DosPerfSysCall);
-
-            if (rc)
-                DosPerfSysCall = NULL;
-
-            rc = DosQueryProcAddr(hDoscalls, 368, NULL, (PFN *)&DosQuerySysState);
-
-            if (rc)
-                DosQuerySysState = NULL;
+    if (!checked_to_use_dosperfsyscall) {
+        char *env;
+        env = getenv("OPENSSL_USE_DOSPERFSYSCALL");
+        if (env) {
+            switch(*env) {
+                case 'T': case 't': case 'Y': case 'y': case 'O': case 'o':
+                    use_dosperfsyscall = 1; break;
+                default:
+                    use_dosperfsyscall = atoi(env) > 0;
+                    break;
+            }
         }
-#endif
+        else {
+            use_dosperfsyscall = 0;
+        }
+        checked_to_use_dosperfsyscall = 1; /* true */
     }
 
     /* Sample the hi-res timer, runs at around 1.1 MHz */
@@ -119,31 +116,49 @@ int RAND_poll(void)
     /* If available, sample CPU registers that count at CPU MHz
      * Only fairly new CPUs (PPro & K6 onwards) & OS/2 versions support this
      */
-    if (DosPerfSysCall) {
+    if (use_dosperfsyscall) {
+        static volatile int perfsyscall_initcount = 0;
         CPUUTIL util;
 
+        /* APAR: The API call to DosPerfSysCall needs to be added 
+         *       to the startup code.
+         * reference: http://www-01.ibm.com/support/docview.wss?uid=swg1IY67424
+         */
+        if (perfsyscall_initcount == 0) {
+            if (DosEnterCritSec() == 0) {
+                if (perfsyscall_initcount == 0)
+                    DosPerfSysCall(CMD_KI_ENABLE, 0, 0, 0);
+                ++perfsyscall_initcount;
+                DosExitCritSec();
+            }
+        }
         if (DosPerfSysCall(CMD_KI_RDCNT, (ULONG)&util, 0, 0) == 0) {
             RAND_add(&util, sizeof(util), 10);
         }
-        else {
-#ifndef __KLIBC__
-            DosPerfSysCall = NULL;
-#endif
+    }
+    else {
+        unsigned char tmpbuf[32];
+        int i;
+        for(i=0; i<sizeof(tmpbuf); i+=2) {
+            unsigned long ul = (unsigned long)random();
+            tmpbuf[i] = (unsigned char)(ul);
+            tmpbuf[i+1] = (unsigned char)(ul >> 8);
         }
+        RAND_add(tmpbuf, sizeof(tmpbuf), sizeof(tmpbuf));
     }
 
     /* DosQuerySysState() gives us a huge quantity of process, thread, memory & handle stats */
-    if (DosQuerySysState) {
-        char *buffer = OPENSSL_malloc(256 * 1024);
-
-        if (DosQuerySysState(0x1F, 0, 0, 0, buffer, 256 * 1024) == 0) {
-            /* First 4 bytes in buffer is a pointer to the thread count
-             * there should be at least 1 byte of entropy per thread
-             */
-            RAND_add(buffer, 256 * 1024, **(ULONG **)buffer);
-        }
-
-        OPENSSL_free(buffer);
+    ULONG buffer_size;
+    char *buffer;
+    buffer = NULL;
+    buffer_size = 65536 * 4;
+    rc = DosAllocMem((PVOID *)&buffer, buffer_size + 65535, PAG_READ | PAG_WRITE | PAG_COMMIT | OBJ_TILE);
+    if (rc == 0 && DosQuerySysState(0x1F, 0, 0, 0, buffer, buffer_size) == 0) {
+        /* First 4 bytes in buffer is a pointer to the thread count
+        * there should be at least 1 byte of entropy per thread
+        */
+        RAND_add(buffer, buffer_size, **(ULONG **)buffer);
+        DosFreeMem(buffer);
         return 1;
     }
 
