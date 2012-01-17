@@ -137,7 +137,7 @@ MAN3=3
 MANSUFFIX=
 HTMLSUFFIX=html
 HTMLDIR=$(OPENSSLDIR)/html
-SHELL=/bin/sh
+SHELL=/@unixroot/usr/bin/sh.exe
 
 TOP=    .
 ONEDIRS=out tmp
