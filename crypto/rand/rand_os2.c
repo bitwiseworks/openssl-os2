@@ -118,7 +118,8 @@ int RAND_poll(void)
      */
     if (use_dosperfsyscall) {
         static volatile int perfsyscall_initcount = 0;
-        CPUUTIL util;
+        // 2011-04-22 SHL really should check #CPUs just in case
+        CPUUTIL util[16];
 
         /* APAR: The API call to DosPerfSysCall needs to be added 
          *       to the startup code.
@@ -132,7 +133,7 @@ int RAND_poll(void)
                 DosExitCritSec();
             }
         }
-        if (DosPerfSysCall(CMD_KI_RDCNT, (ULONG)&util, 0, 0) == 0) {
+        if (DosPerfSysCall(CMD_KI_RDCNT, (ULONG)util, 0, 0) == 0) {
             RAND_add(&util, sizeof(util), 10);
         }
     }
