@@ -140,7 +140,7 @@ int X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags, unsigned long cflag)
 		if (bs->length <= 4)
 			{
 			l=ASN1_INTEGER_get(bs);
-			if (l < 0)
+			if (bs->type == V_ASN1_NEG_INTEGER)
 				{
 				l= -l;
 				neg="-";
@@ -440,6 +440,8 @@ int X509_NAME_print(BIO *bp, X509_NAME *name, int obase)
 	l=80-2-obase;
 
 	b=X509_NAME_oneline(name,NULL,0);
+	if (!b)
+		return 0;
 	if (!*b)
 		{
 		OPENSSL_free(b);

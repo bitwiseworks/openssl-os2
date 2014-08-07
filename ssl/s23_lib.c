@@ -92,15 +92,8 @@ const SSL_CIPHER *ssl23_get_cipher(unsigned int u)
  * available */
 const SSL_CIPHER *ssl23_get_cipher_by_char(const unsigned char *p)
 	{
-	SSL_CIPHER c;
 	const SSL_CIPHER *cp;
-	unsigned long id;
-	int n;
 
-	n=ssl3_num_ciphers();
-	id=0x03000000|((unsigned long)p[0]<<16L)|
-		((unsigned long)p[1]<<8L)|(unsigned long)p[2];
-	c.id=id;
 	cp=ssl3_get_cipher_by_char(p);
 #ifndef OPENSSL_NO_SSL2
 	if (cp == NULL)
@@ -114,6 +107,13 @@ int ssl23_put_cipher_by_char(const SSL_CIPHER *c, unsigned char *p)
 	long l;
 
 	/* We can write SSLv2 and SSLv3 ciphers */
+	/* but no ECC ciphers */
+	if (c->algorithm_mkey == SSL_kECDHr ||
+		c->algorithm_mkey == SSL_kECDHe ||
+		c->algorithm_mkey == SSL_kEECDH ||
+		c->algorithm_auth == SSL_aECDH ||
+		c->algorithm_auth == SSL_aECDSA)
+		return 0;
 	if (p != NULL)
 		{
 		l=c->id;

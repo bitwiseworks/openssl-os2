@@ -410,6 +410,7 @@ static void sv_usage(void)
 	BIO_printf(bio_err," -context arg  - set session ID context\n");
 	BIO_printf(bio_err," -verify arg   - turn on peer certificate verification\n");
 	BIO_printf(bio_err," -Verify arg   - turn on peer certificate verification, must have a cert.\n");
+	BIO_printf(bio_err," -verify_return_error - return verification errors\n");
 	BIO_printf(bio_err," -cert arg     - certificate file to use\n");
 	BIO_printf(bio_err,"                 (default is %s)\n",TEST_CERT);
 	BIO_printf(bio_err," -crl_check    - check the peer certificate has not been revoked by its CA.\n" \
@@ -473,6 +474,7 @@ static void sv_usage(void)
 	BIO_printf(bio_err," -no_ecdhe     - Disable ephemeral ECDH\n");
 #endif
 	BIO_printf(bio_err," -bugs         - Turn on SSL bug compatibility\n");
+	BIO_printf(bio_err," -hack         - workaround for early Netscape code\n");
 	BIO_printf(bio_err," -www          - Respond to a 'GET /' with a status page\n");
 	BIO_printf(bio_err," -WWW          - Respond to a 'GET /<path> HTTP/1.0' with file ./<path>\n");
 	BIO_printf(bio_err," -HTTP         - Respond to a 'GET /<path> HTTP/1.0' with file ./<path>\n");
@@ -493,6 +495,10 @@ static void sv_usage(void)
 	BIO_printf(bio_err," -no_ticket    - disable use of RFC4507bis session tickets\n");
 	BIO_printf(bio_err," -legacy_renegotiation - enable use of legacy renegotiation (dangerous)\n");
 #endif
+	BIO_printf(bio_err," -status           - respond to certificate status requests\n");
+	BIO_printf(bio_err," -status_verbose   - enable status request verbose printout\n");
+	BIO_printf(bio_err," -status_timeout n - status request responder timeout\n");
+	BIO_printf(bio_err," -status_url URL   - status request fallback URL\n");
 	}
 
 static int local_argc=0;
@@ -670,7 +676,7 @@ static int MS_CALLBACK ssl_servername_cb(SSL *s, int *ad, void *arg)
 	
 	if (servername)
 		{
-    		if (strcmp(servername,p->servername)) 
+    		if (strcasecmp(servername,p->servername)) 
 			return p->extension_error;
 		if (ctx2)
 			{
@@ -872,13 +878,7 @@ int MAIN(int argc, char *argv[])
 	/* by default do not send a PSK identity hint */
 	static char *psk_identity_hint=NULL;
 #endif
-#if !defined(OPENSSL_NO_SSL2) && !defined(OPENSSL_NO_SSL3)
 	meth=SSLv23_server_method();
-#elif !defined(OPENSSL_NO_SSL3)
-	meth=SSLv3_server_method();
-#elif !defined(OPENSSL_NO_SSL2)
-	meth=SSLv2_server_method();
-#endif
 
 	local_argc=argc;
 	local_argv=argv;
@@ -1103,7 +1103,7 @@ int MAIN(int argc, char *argv[])
 			psk_key=*(++argv);
 			for (i=0; i<strlen(psk_key); i++)
 				{
-				if (isxdigit((int)psk_key[i]))
+				if (isxdigit((unsigned char)psk_key[i]))
 					continue;
 				BIO_printf(bio_err,"Not a hex number '%s'\n",*argv);
 				goto bad;
@@ -1215,6 +1215,14 @@ bad:
 		sv_usage();
 		goto end;
 		}
+#ifndef OPENSSL_NO_DTLS1
+	if (www && socket_type == SOCK_DGRAM)
+		{
+		BIO_printf(bio_err,
+				"Can't use -HTTP, -www or -WWW with DTLS\n");
+		goto end;
+		}
+#endif
 
 #if !defined(OPENSSL_NO_JPAKE) && !defined(OPENSSL_NO_PSK)
 	if (jpake_secret)
@@ -1715,7 +1723,15 @@ end:
 		OPENSSL_free(pass);
 	if (dpass)
 		OPENSSL_free(dpass);
+	if (vpm)
+		X509_VERIFY_PARAM_free(vpm);
 #ifndef OPENSSL_NO_TLSEXT
+	if (tlscstatp.host)
+		OPENSSL_free(tlscstatp.host);
+	if (tlscstatp.port)
+		OPENSSL_free(tlscstatp.port);
+	if (tlscstatp.path)
+		OPENSSL_free(tlscstatp.path);
 	if (ctx2 != NULL) SSL_CTX_free(ctx2);
 	if (s_cert2)
 		X509_free(s_cert2);
@@ -2254,11 +2270,10 @@ static int www_body(char *hostname, int s, unsigned char *context)
 	{
 	char *buf=NULL;
 	int ret=1;
-	int i,j,k,blank,dot;
+	int i,j,k,dot;
 	SSL *con;
 	const SSL_CIPHER *c;
 	BIO *io,*ssl_bio,*sbio;
-	long total_bytes;
 
 	buf=OPENSSL_malloc(bufsize);
 	if (buf == NULL) return(0);
@@ -2329,7 +2344,6 @@ static int www_body(char *hostname, int s, unsigned char *context)
 		SSL_set_msg_callback_arg(con, bio_s_out);
 		}
 
-	blank=0;
 	for (;;)
 		{
 		if (hack)
@@ -2559,7 +2573,6 @@ static int www_body(char *hostname, int s, unsigned char *context)
                                         BIO_puts(io,"HTTP/1.0 200 ok\r\nContent-type: text/plain\r\n\r\n");
                                 }
 			/* send the file */
-			total_bytes=0;
 			for (;;)
 				{
 				i=BIO_read(file,buf,bufsize);

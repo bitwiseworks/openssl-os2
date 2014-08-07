@@ -2,6 +2,330 @@
  OpenSSL CHANGES
  _______________
 
+ Changes between 1.0.0m and 1.0.0n [6 Aug 2014]
+
+  *) OpenSSL DTLS clients enabling anonymous (EC)DH ciphersuites are subject
+     to a denial of service attack. A malicious server can crash the client
+     with a null pointer dereference (read) by specifying an anonymous (EC)DH
+     ciphersuite and sending carefully crafted handshake messages.
+
+     Thanks to Felix Gröbert (Google) for discovering and researching this
+     issue.
+     (CVE-2014-3510)
+     [Emilia Käsper]
+
+  *) By sending carefully crafted DTLS packets an attacker could cause openssl
+     to leak memory. This can be exploited through a Denial of Service attack.
+     Thanks to Adam Langley for discovering and researching this issue.
+     (CVE-2014-3507)
+     [Adam Langley]
+
+  *) An attacker can force openssl to consume large amounts of memory whilst
+     processing DTLS handshake messages. This can be exploited through a
+     Denial of Service attack.
+     Thanks to Adam Langley for discovering and researching this issue.
+     (CVE-2014-3506)
+     [Adam Langley]
+
+  *) An attacker can force an error condition which causes openssl to crash
+     whilst processing DTLS packets due to memory being freed twice. This
+     can be exploited through a Denial of Service attack.
+     Thanks to Adam Langley and Wan-Teh Chang for discovering and researching
+     this issue.
+     (CVE-2014-3505)
+     [Adam Langley]
+
+  *) If a multithreaded client connects to a malicious server using a resumed
+     session and the server sends an ec point format extension it could write
+     up to 255 bytes to freed memory.
+
+     Thanks to Gabor Tyukasz (LogMeIn Inc) for discovering and researching this
+     issue.
+     (CVE-2014-3509)
+     [Gabor Tyukasz]
+
+  *) A flaw in OBJ_obj2txt may cause pretty printing functions such as
+     X509_name_oneline, X509_name_print_ex et al. to leak some information
+     from the stack. Applications may be affected if they echo pretty printing
+     output to the attacker.
+
+     Thanks to Ivan Fratric (Google) for discovering this issue.
+     (CVE-2014-3508)
+     [Emilia Käsper, and Steve Henson]
+
+  *) Fix ec_GFp_simple_points_make_affine (thus, EC_POINTs_mul etc.)
+     for corner cases. (Certain input points at infinity could lead to
+     bogus results, with non-infinity inputs mapped to infinity too.)
+     [Bodo Moeller]
+
+ Changes between 1.0.0l and 1.0.0m [5 Jun 2014]
+
+  *) Fix for SSL/TLS MITM flaw. An attacker using a carefully crafted
+     handshake can force the use of weak keying material in OpenSSL
+     SSL/TLS clients and servers.
+
+     Thanks to KIKUCHI Masashi (Lepidum Co. Ltd.) for discovering and
+     researching this issue. (CVE-2014-0224)
+     [KIKUCHI Masashi, Steve Henson]
+
+  *) Fix DTLS recursion flaw. By sending an invalid DTLS handshake to an
+     OpenSSL DTLS client the code can be made to recurse eventually crashing
+     in a DoS attack.
+
+     Thanks to Imre Rad (Search-Lab Ltd.) for discovering this issue.
+     (CVE-2014-0221)
+     [Imre Rad, Steve Henson]
+
+  *) Fix DTLS invalid fragment vulnerability. A buffer overrun attack can
+     be triggered by sending invalid DTLS fragments to an OpenSSL DTLS
+     client or server. This is potentially exploitable to run arbitrary
+     code on a vulnerable client or server.
+
+     Thanks to Jüri Aedla for reporting this issue. (CVE-2014-0195)
+     [Jüri Aedla, Steve Henson]
+
+  *) Fix bug in TLS code where clients enable anonymous ECDH ciphersuites
+     are subject to a denial of service attack.
+
+     Thanks to Felix Gröbert and Ivan Fratric at Google for discovering
+     this issue. (CVE-2014-3470)
+     [Felix Gröbert, Ivan Fratric, Steve Henson]
+
+  *) Harmonize version and its documentation. -f flag is used to display
+     compilation flags.
+     [mancha <mancha1@zoho.com>]
+
+  *) Fix eckey_priv_encode so it immediately returns an error upon a failure
+     in i2d_ECPrivateKey.
+     [mancha <mancha1@zoho.com>]
+
+  *) Fix some double frees. These are not thought to be exploitable.
+     [mancha <mancha1@zoho.com>]
+
+  *) Fix for the attack described in the paper "Recovering OpenSSL
+     ECDSA Nonces Using the FLUSH+RELOAD Cache Side-channel Attack"
+     by Yuval Yarom and Naomi Benger. Details can be obtained from:
+     http://eprint.iacr.org/2014/140
+
+     Thanks to Yuval Yarom and Naomi Benger for discovering this
+     flaw and to Yuval Yarom for supplying a fix (CVE-2014-0076)
+     [Yuval Yarom and Naomi Benger]
+
+ Changes between 1.0.0k and 1.0.0l [6 Jan 2014]
+
+  *) Keep original DTLS digest and encryption contexts in retransmission
+     structures so we can use the previous session parameters if they need
+     to be resent. (CVE-2013-6450)
+     [Steve Henson]
+
+  *) Add option SSL_OP_SAFARI_ECDHE_ECDSA_BUG (part of SSL_OP_ALL) which
+     avoids preferring ECDHE-ECDSA ciphers when the client appears to be
+     Safari on OS X.  Safari on OS X 10.8..10.8.3 advertises support for
+     several ECDHE-ECDSA ciphers, but fails to negotiate them.  The bug
+     is fixed in OS X 10.8.4, but Apple have ruled out both hot fixing
+     10.8..10.8.3 and forcing users to upgrade to 10.8.4 or newer.
+     [Rob Stradling, Adam Langley]
+
+ Changes between 1.0.0j and 1.0.0k [5 Feb 2013]
+
+  *) Make the decoding of SSLv3, TLS and DTLS CBC records constant time.
+
+     This addresses the flaw in CBC record processing discovered by 
+     Nadhem Alfardan and Kenny Paterson. Details of this attack can be found
+     at: http://www.isg.rhul.ac.uk/tls/     
+
+     Thanks go to Nadhem Alfardan and Kenny Paterson of the Information
+     Security Group at Royal Holloway, University of London
+     (www.isg.rhul.ac.uk) for discovering this flaw and Adam Langley and
+     Emilia Käsper for the initial patch.
+     (CVE-2013-0169)
+     [Emilia Käsper, Adam Langley, Ben Laurie, Andy Polyakov, Steve Henson]
+
+  *) Return an error when checking OCSP signatures when key is NULL.
+     This fixes a DoS attack. (CVE-2013-0166)
+     [Steve Henson]
+
+  *) Call OCSP Stapling callback after ciphersuite has been chosen, so
+     the right response is stapled. Also change SSL_get_certificate()
+     so it returns the certificate actually sent.
+     See http://rt.openssl.org/Ticket/Display.html?id=2836.
+     (This is a backport)
+     [Rob Stradling <rob.stradling@comodo.com>]
+
+  *) Fix possible deadlock when decoding public keys.
+     [Steve Henson]
+
+ Changes between 1.0.0i and 1.0.0j [10 May 2012]
+
+  [NB: OpenSSL 1.0.0i and later 1.0.0 patch levels were released after
+  OpenSSL 1.0.1.]
+
+  *) Sanity check record length before skipping explicit IV in DTLS
+     to fix DoS attack.
+
+     Thanks to Codenomicon for discovering this issue using Fuzz-o-Matic
+     fuzzing as a service testing platform.
+     (CVE-2012-2333)
+     [Steve Henson]
+
+  *) Initialise tkeylen properly when encrypting CMS messages.
+     Thanks to Solar Designer of Openwall for reporting this issue.
+     [Steve Henson]
+
+ Changes between 1.0.0h and 1.0.0i [19 Apr 2012]
+
+  *) Check for potentially exploitable overflows in asn1_d2i_read_bio
+     BUF_mem_grow and BUF_mem_grow_clean. Refuse attempts to shrink buffer
+     in CRYPTO_realloc_clean.
+
+     Thanks to Tavis Ormandy, Google Security Team, for discovering this
+     issue and to Adam Langley <agl@chromium.org> for fixing it.
+     (CVE-2012-2110)
+     [Adam Langley (Google), Tavis Ormandy, Google Security Team]
+
+ Changes between 1.0.0g and 1.0.0h [12 Mar 2012]
+
+  *) Fix MMA (Bleichenbacher's attack on PKCS #1 v1.5 RSA padding) weakness
+     in CMS and PKCS7 code. When RSA decryption fails use a random key for
+     content decryption and always return the same error. Note: this attack
+     needs on average 2^20 messages so it only affects automated senders. The
+     old behaviour can be reenabled in the CMS code by setting the
+     CMS_DEBUG_DECRYPT flag: this is useful for debugging and testing where
+     an MMA defence is not necessary.
+     Thanks to Ivan Nestlerode <inestlerode@us.ibm.com> for discovering
+     this issue. (CVE-2012-0884)
+     [Steve Henson]
+
+  *) Fix CVE-2011-4619: make sure we really are receiving a 
+     client hello before rejecting multiple SGC restarts. Thanks to
+     Ivan Nestlerode <inestlerode@us.ibm.com> for discovering this bug.
+     [Steve Henson]
+
+ Changes between 1.0.0f and 1.0.0g [18 Jan 2012]
+
+  *) Fix for DTLS DoS issue introduced by fix for CVE-2011-4109.
+     Thanks to Antonio Martin, Enterprise Secure Access Research and
+     Development, Cisco Systems, Inc. for discovering this bug and
+     preparing a fix. (CVE-2012-0050)
+     [Antonio Martin]
+
+ Changes between 1.0.0e and 1.0.0f [4 Jan 2012]
+
+  *) Nadhem Alfardan and Kenny Paterson have discovered an extension
+     of the Vaudenay padding oracle attack on CBC mode encryption
+     which enables an efficient plaintext recovery attack against
+     the OpenSSL implementation of DTLS. Their attack exploits timing
+     differences arising during decryption processing. A research
+     paper describing this attack can be found at:
+                  http://www.isg.rhul.ac.uk/~kp/dtls.pdf
+     Thanks go to Nadhem Alfardan and Kenny Paterson of the Information
+     Security Group at Royal Holloway, University of London
+     (www.isg.rhul.ac.uk) for discovering this flaw and to Robin Seggelmann
+     <seggelmann@fh-muenster.de> and Michael Tuexen <tuexen@fh-muenster.de>
+     for preparing the fix. (CVE-2011-4108)
+     [Robin Seggelmann, Michael Tuexen]
+
+  *) Clear bytes used for block padding of SSL 3.0 records.
+     (CVE-2011-4576)
+     [Adam Langley (Google)]
+
+  *) Only allow one SGC handshake restart for SSL/TLS. Thanks to George
+     Kadianakis <desnacked@gmail.com> for discovering this issue and
+     Adam Langley for preparing the fix. (CVE-2011-4619)
+     [Adam Langley (Google)]
+
+  *) Check parameters are not NULL in GOST ENGINE. (CVE-2012-0027)
+     [Andrey Kulikov <amdeich@gmail.com>]
+
+  *) Prevent malformed RFC3779 data triggering an assertion failure.
+     Thanks to Andrew Chi, BBN Technologies, for discovering the flaw
+     and Rob Austein <sra@hactrn.net> for fixing it. (CVE-2011-4577)
+     [Rob Austein <sra@hactrn.net>]
+
+  *) Improved PRNG seeding for VOS.
+     [Paul Green <Paul.Green@stratus.com>]
+
+  *) Fix ssl_ciph.c set-up race.
+     [Adam Langley (Google)]
+
+  *) Fix spurious failures in ecdsatest.c.
+     [Emilia Käsper (Google)]
+
+  *) Fix the BIO_f_buffer() implementation (which was mixing different
+     interpretations of the '..._len' fields).
+     [Adam Langley (Google)]
+
+  *) Fix handling of BN_BLINDING: now BN_BLINDING_invert_ex (rather than
+     BN_BLINDING_invert_ex) calls BN_BLINDING_update, ensuring that concurrent
+     threads won't reuse the same blinding coefficients.
+
+     This also avoids the need to obtain the CRYPTO_LOCK_RSA_BLINDING
+     lock to call BN_BLINDING_invert_ex, and avoids one use of
+     BN_BLINDING_update for each BN_BLINDING structure (previously,
+     the last update always remained unused).
+     [Emilia Käsper (Google)]
+
+  *) In ssl3_clear, preserve s3->init_extra along with s3->rbuf.
+     [Bob Buckholz (Google)]
+
+ Changes between 1.0.0d and 1.0.0e [6 Sep 2011]
+
+  *) Fix bug where CRLs with nextUpdate in the past are sometimes accepted
+     by initialising X509_STORE_CTX properly. (CVE-2011-3207)
+     [Kaspar Brand <ossl@velox.ch>]
+
+  *) Fix SSL memory handling for (EC)DH ciphersuites, in particular
+     for multi-threaded use of ECDH. (CVE-2011-3210)
+     [Adam Langley (Google)]
+
+  *) Fix x509_name_ex_d2i memory leak on bad inputs.
+     [Bodo Moeller]
+
+  *) Remove hard coded ecdsaWithSHA1 signature tests in ssl code and check
+     signature public key algorithm by using OID xref utilities instead.
+     Before this you could only use some ECC ciphersuites with SHA1 only.
+     [Steve Henson]
+
+  *) Add protection against ECDSA timing attacks as mentioned in the paper
+     by Billy Bob Brumley and Nicola Tuveri, see:
+
+	http://eprint.iacr.org/2011/232.pdf
+
+     [Billy Bob Brumley and Nicola Tuveri]
+
+ Changes between 1.0.0c and 1.0.0d [8 Feb 2011]
+
+  *) Fix parsing of OCSP stapling ClientHello extension. CVE-2011-0014
+     [Neel Mehta, Adam Langley, Bodo Moeller (Google)]
+
+  *) Fix bug in string printing code: if *any* escaping is enabled we must
+     escape the escape character (backslash) or the resulting string is
+     ambiguous.
+     [Steve Henson]
+
+ Changes between 1.0.0b and 1.0.0c  [2 Dec 2010]
+
+  *) Disable code workaround for ancient and obsolete Netscape browsers
+     and servers: an attacker can use it in a ciphersuite downgrade attack.
+     Thanks to Martin Rex for discovering this bug. CVE-2010-4180
+     [Steve Henson]
+
+  *) Fixed J-PAKE implementation error, originally discovered by
+     Sebastien Martini, further info and confirmation from Stefan
+     Arentz and Feng Hao. Note that this fix is a security fix. CVE-2010-4252
+     [Ben Laurie]
+
+ Changes between 1.0.0a and 1.0.0b  [16 Nov 2010]
+
+  *) Fix extension code to avoid race conditions which can result in a buffer
+     overrun vulnerability: resumed sessions must not be modified as they can
+     be shared by multiple threads. CVE-2010-3864
+     [Steve Henson]
+
+  *) Fix WIN32 build system to correctly link an ENGINE directory into
+     a DLL. 
+     [Steve Henson]
+
  Changes between 1.0.0 and 1.0.0a  [01 Jun 2010]
 
   *) Check return value of int_rsa_verify in pkey_rsa_verifyrecover 
@@ -848,8 +1172,213 @@
 
   *) Change 'Configure' script to enable Camellia by default.
      [NTT]
-  
- Changes between 0.9.8n and 0.9.8o [xx XXX xxxx]
+
+ Changes between 0.9.8x and 0.9.8y [5 Feb 2013]
+
+  *) Make the decoding of SSLv3, TLS and DTLS CBC records constant time.
+
+     This addresses the flaw in CBC record processing discovered by 
+     Nadhem Alfardan and Kenny Paterson. Details of this attack can be found
+     at: http://www.isg.rhul.ac.uk/tls/     
+
+     Thanks go to Nadhem Alfardan and Kenny Paterson of the Information
+     Security Group at Royal Holloway, University of London
+     (www.isg.rhul.ac.uk) for discovering this flaw and Adam Langley and
+     Emilia Käsper for the initial patch.
+     (CVE-2013-0169)
+     [Emilia Käsper, Adam Langley, Ben Laurie, Andy Polyakov, Steve Henson]
+
+  *) Return an error when checking OCSP signatures when key is NULL.
+     This fixes a DoS attack. (CVE-2013-0166)
+     [Steve Henson]
+
+  *) Call OCSP Stapling callback after ciphersuite has been chosen, so
+     the right response is stapled. Also change SSL_get_certificate()
+     so it returns the certificate actually sent.
+     See http://rt.openssl.org/Ticket/Display.html?id=2836.
+     (This is a backport)
+     [Rob Stradling <rob.stradling@comodo.com>]
+
+  *) Fix possible deadlock when decoding public keys.
+     [Steve Henson]
+
+ Changes between 0.9.8w and 0.9.8x [10 May 2012]
+
+  *) Sanity check record length before skipping explicit IV in DTLS
+     to fix DoS attack.
+
+     Thanks to Codenomicon for discovering this issue using Fuzz-o-Matic
+     fuzzing as a service testing platform.
+     (CVE-2012-2333)
+     [Steve Henson]
+
+  *) Initialise tkeylen properly when encrypting CMS messages.
+     Thanks to Solar Designer of Openwall for reporting this issue.
+     [Steve Henson]
+
+ Changes between 0.9.8v and 0.9.8w [23 Apr 2012]
+
+  *) The fix for CVE-2012-2110 did not take into account that the 
+     'len' argument to BUF_MEM_grow and BUF_MEM_grow_clean is an
+     int in OpenSSL 0.9.8, making it still vulnerable. Fix by 
+     rejecting negative len parameter. (CVE-2012-2131)
+     [Tomas Hoger <thoger@redhat.com>]
+
+ Changes between 0.9.8u and 0.9.8v [19 Apr 2012]
+
+  *) Check for potentially exploitable overflows in asn1_d2i_read_bio
+     BUF_mem_grow and BUF_mem_grow_clean. Refuse attempts to shrink buffer
+     in CRYPTO_realloc_clean.
+
+     Thanks to Tavis Ormandy, Google Security Team, for discovering this
+     issue and to Adam Langley <agl@chromium.org> for fixing it.
+     (CVE-2012-2110)
+     [Adam Langley (Google), Tavis Ormandy, Google Security Team]
+
+ Changes between 0.9.8t and 0.9.8u [12 Mar 2012]
+
+  *) Fix MMA (Bleichenbacher's attack on PKCS #1 v1.5 RSA padding) weakness
+     in CMS and PKCS7 code. When RSA decryption fails use a random key for
+     content decryption and always return the same error. Note: this attack
+     needs on average 2^20 messages so it only affects automated senders. The
+     old behaviour can be reenabled in the CMS code by setting the
+     CMS_DEBUG_DECRYPT flag: this is useful for debugging and testing where
+     an MMA defence is not necessary.
+     Thanks to Ivan Nestlerode <inestlerode@us.ibm.com> for discovering
+     this issue. (CVE-2012-0884)
+     [Steve Henson]
+
+  *) Fix CVE-2011-4619: make sure we really are receiving a 
+     client hello before rejecting multiple SGC restarts. Thanks to
+     Ivan Nestlerode <inestlerode@us.ibm.com> for discovering this bug.
+     [Steve Henson]
+
+ Changes between 0.9.8s and 0.9.8t [18 Jan 2012]
+
+  *) Fix for DTLS DoS issue introduced by fix for CVE-2011-4109.
+     Thanks to Antonio Martin, Enterprise Secure Access Research and
+     Development, Cisco Systems, Inc. for discovering this bug and
+     preparing a fix. (CVE-2012-0050)
+     [Antonio Martin]
+
+ Changes between 0.9.8r and 0.9.8s [4 Jan 2012]
+
+  *) Nadhem Alfardan and Kenny Paterson have discovered an extension
+     of the Vaudenay padding oracle attack on CBC mode encryption
+     which enables an efficient plaintext recovery attack against
+     the OpenSSL implementation of DTLS. Their attack exploits timing
+     differences arising during decryption processing. A research
+     paper describing this attack can be found at:
+                  http://www.isg.rhul.ac.uk/~kp/dtls.pdf
+     Thanks go to Nadhem Alfardan and Kenny Paterson of the Information
+     Security Group at Royal Holloway, University of London
+     (www.isg.rhul.ac.uk) for discovering this flaw and to Robin Seggelmann
+     <seggelmann@fh-muenster.de> and Michael Tuexen <tuexen@fh-muenster.de>
+     for preparing the fix. (CVE-2011-4108)
+     [Robin Seggelmann, Michael Tuexen]
+
+  *) Stop policy check failure freeing same buffer twice. (CVE-2011-4109)
+     [Ben Laurie, Kasper <ekasper@google.com>]
+
+  *) Clear bytes used for block padding of SSL 3.0 records.
+     (CVE-2011-4576)
+     [Adam Langley (Google)]
+
+  *) Only allow one SGC handshake restart for SSL/TLS. Thanks to George
+     Kadianakis <desnacked@gmail.com> for discovering this issue and
+     Adam Langley for preparing the fix. (CVE-2011-4619)
+     [Adam Langley (Google)]
+ 
+  *) Prevent malformed RFC3779 data triggering an assertion failure.
+     Thanks to Andrew Chi, BBN Technologies, for discovering the flaw
+     and Rob Austein <sra@hactrn.net> for fixing it. (CVE-2011-4577)
+     [Rob Austein <sra@hactrn.net>]
+
+  *) Fix ssl_ciph.c set-up race.
+     [Adam Langley (Google)]
+
+  *) Fix spurious failures in ecdsatest.c.
+     [Emilia Käsper (Google)]
+
+  *) Fix the BIO_f_buffer() implementation (which was mixing different
+     interpretations of the '..._len' fields).
+     [Adam Langley (Google)]
+
+  *) Fix handling of BN_BLINDING: now BN_BLINDING_invert_ex (rather than
+     BN_BLINDING_invert_ex) calls BN_BLINDING_update, ensuring that concurrent
+     threads won't reuse the same blinding coefficients.
+
+     This also avoids the need to obtain the CRYPTO_LOCK_RSA_BLINDING
+     lock to call BN_BLINDING_invert_ex, and avoids one use of
+     BN_BLINDING_update for each BN_BLINDING structure (previously,
+     the last update always remained unused).
+     [Emilia Käsper (Google)]
+
+  *) Fix SSL memory handling for (EC)DH ciphersuites, in particular
+     for multi-threaded use of ECDH.
+     [Adam Langley (Google)]
+
+  *) Fix x509_name_ex_d2i memory leak on bad inputs.
+     [Bodo Moeller]
+
+  *) Add protection against ECDSA timing attacks as mentioned in the paper
+     by Billy Bob Brumley and Nicola Tuveri, see:
+
+	http://eprint.iacr.org/2011/232.pdf
+
+     [Billy Bob Brumley and Nicola Tuveri]
+
+ Changes between 0.9.8q and 0.9.8r [8 Feb 2011]
+
+  *) Fix parsing of OCSP stapling ClientHello extension. CVE-2011-0014
+     [Neel Mehta, Adam Langley, Bodo Moeller (Google)]
+
+  *) Fix bug in string printing code: if *any* escaping is enabled we must
+     escape the escape character (backslash) or the resulting string is
+     ambiguous.
+     [Steve Henson]
+
+ Changes between 0.9.8p and 0.9.8q [2 Dec 2010]
+
+  *) Disable code workaround for ancient and obsolete Netscape browsers
+     and servers: an attacker can use it in a ciphersuite downgrade attack.
+     Thanks to Martin Rex for discovering this bug. CVE-2010-4180
+     [Steve Henson]
+
+  *) Fixed J-PAKE implementation error, originally discovered by
+     Sebastien Martini, further info and confirmation from Stefan
+     Arentz and Feng Hao. Note that this fix is a security fix. CVE-2010-4252
+     [Ben Laurie]
+
+ Changes between 0.9.8o and 0.9.8p [16 Nov 2010]
+
+  *) Fix extension code to avoid race conditions which can result in a buffer
+     overrun vulnerability: resumed sessions must not be modified as they can
+     be shared by multiple threads. CVE-2010-3864
+     [Steve Henson]
+
+  *) Fix for double free bug in ssl/s3_clnt.c CVE-2010-2939
+     [Steve Henson]
+
+  *) Don't reencode certificate when calculating signature: cache and use
+     the original encoding instead. This makes signature verification of
+     some broken encodings work correctly.
+     [Steve Henson]
+
+  *) ec2_GF2m_simple_mul bugfix: compute correct result if the output EC_POINT
+     is also one of the inputs.
+     [Emilia Käsper <emilia.kasper@esat.kuleuven.be> (Google)]
+
+  *) Don't repeatedly append PBE algorithms to table if they already exist.
+     Sort table on each new add. This effectively makes the table read only
+     after all algorithms are added and subsequent calls to PKCS12_pbe_add
+     etc are non-op.
+     [Steve Henson]
+
+ Changes between 0.9.8n and 0.9.8o [01 Jun 2010]
+
+  [NB: OpenSSL 0.9.8o and later 0.9.8 patch levels were released after
+  OpenSSL 1.0.0.]
 
   *) Correct a typo in the CMS ASN1 module which can result in invalid memory
      access or freeing data twice (CVE-2010-0742)
@@ -860,6 +1389,12 @@
      SSL_library_init and not OpenSSL_add_all_algorithms() will fail.
      [Steve Henson]
 
+  *) VMS fixes: 
+     Reduce copying into .apps and .test in makevms.com
+     Don't try to use blank CA certificate in CA.com
+     Allow use of C files from original directories in maketests.com
+     [Steven M. Schweda" <sms@antinode.info>]
+
  Changes between 0.9.8m and 0.9.8n [24 Mar 2010]
 
   *) When rejecting SSL/TLS records due to an incorrect version number, never
@@ -868,8 +1403,8 @@
      - OpenSSL 0.9.8f if 'short' is longer than 16 bits,
      the previous behavior could result in a read attempt at NULL when
      receiving specific incorrect SSL/TLS records once record payload
-     protection is active.  (CVE-2010-####)
-     [Bodo Moeller, Adam Langley]
+     protection is active.  (CVE-2010-0740)
+     [Bodo Moeller, Adam Langley <agl@chromium.org>]
 
   *) Fix for CVE-2010-0433 where some kerberos enabled versions of OpenSSL 
      could be crashed if the relevant tables were not present (e.g. chrooted).

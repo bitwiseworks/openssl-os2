@@ -1599,12 +1599,14 @@ static int certify(X509 **xret, char *infile, EVP_PKEY *pkey, X509 *x509,
 		{
 		ok=0;
 		BIO_printf(bio_err,"Signature verification problems....\n");
+		ERR_print_errors(bio_err);
 		goto err;
 		}
 	if (i == 0)
 		{
 		ok=0;
 		BIO_printf(bio_err,"Signature did not match the certificate request\n");
+		ERR_print_errors(bio_err);
 		goto err;
 		}
 	else
@@ -2536,7 +2538,7 @@ static int get_certificate_status(const char *serial, CA_DB *db)
 			
 	/* Make it Upper Case */
 	for (i=0; row[DB_serial][i] != '\0'; i++)
-		row[DB_serial][i] = toupper(row[DB_serial][i]);
+		row[DB_serial][i] = toupper((unsigned char)row[DB_serial][i]);
 	
 
 	ok=1;
@@ -2751,6 +2753,9 @@ char *make_revocation_str(int rev_type, char *rev_arg)
 		}
 
 	revtm = X509_gmtime_adj(NULL, 0);
+
+	if (!revtm)
+		return NULL;
 
 	i = revtm->length + 1;
 
