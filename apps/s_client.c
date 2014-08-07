@@ -284,6 +284,7 @@ static void sc_usage(void)
 	BIO_printf(bio_err," -connect host:port - who to connect to (default is %s:%s)\n",SSL_HOST_NAME,PORT_STR);
 
 	BIO_printf(bio_err," -verify arg   - turn on peer certificate verification\n");
+	BIO_printf(bio_err," -verify_return_error - return verification errors\n");
 	BIO_printf(bio_err," -cert arg     - certificate file to use, PEM format assumed\n");
 	BIO_printf(bio_err," -certform arg - certificate format (PEM or DER) PEM default\n");
 	BIO_printf(bio_err," -key arg      - Private key file to use, in cert file if\n");
@@ -294,6 +295,7 @@ static void sc_usage(void)
 	BIO_printf(bio_err," -CAfile arg   - PEM format file of CA's\n");
 	BIO_printf(bio_err," -reconnect    - Drop and re-make the connection with the same Session-ID\n");
 	BIO_printf(bio_err," -pause        - sleep(1) after each read(2) and write(2) system call\n");
+	BIO_printf(bio_err," -prexit       - print session information even on connection failure\n");
 	BIO_printf(bio_err," -showcerts    - show all certificates in the chain\n");
 	BIO_printf(bio_err," -debug        - extra output\n");
 #ifdef WATT32
@@ -440,13 +442,7 @@ int MAIN(int argc, char **argv)
 	char *jpake_secret = NULL;
 #endif
 
-#if !defined(OPENSSL_NO_SSL2) && !defined(OPENSSL_NO_SSL3)
 	meth=SSLv23_client_method();
-#elif !defined(OPENSSL_NO_SSL3)
-	meth=SSLv3_client_method();
-#elif !defined(OPENSSL_NO_SSL2)
-	meth=SSLv2_client_method();
-#endif
 
 	apps_startup();
 	c_Pause=0;
@@ -581,7 +577,7 @@ int MAIN(int argc, char **argv)
 			psk_key=*(++argv);
 			for (j = 0; j < strlen(psk_key); j++)
                                 {
-                                if (isxdigit((int)psk_key[j]))
+                                if (isxdigit((unsigned char)psk_key[j]))
                                         continue;
                                 BIO_printf(bio_err,"Not a hex number '%s'\n",*argv);
                                 goto bad;
@@ -749,14 +745,13 @@ bad:
 			goto end;
 			}
 		psk_identity = "JPAKE";
+		if (cipher)
+			{
+			BIO_printf(bio_err, "JPAKE sets cipher to PSK\n");
+			goto end;
+			}
+		cipher = "PSK";
 		}
-
-	if (cipher)
-		{
-		BIO_printf(bio_err, "JPAKE sets cipher to PSK\n");
-		goto end;
-		}
-	cipher = "PSK";
 #endif
 
 	OpenSSL_add_ssl_algorithms();
@@ -1603,6 +1598,8 @@ end:
 		EVP_PKEY_free(key);
 	if (pass)
 		OPENSSL_free(pass);
+	if (vpm)
+		X509_VERIFY_PARAM_free(vpm);
 	if (cbuf != NULL) { OPENSSL_cleanse(cbuf,BUFSIZZ); OPENSSL_free(cbuf); }
 	if (sbuf != NULL) { OPENSSL_cleanse(sbuf,BUFSIZZ); OPENSSL_free(sbuf); }
 	if (mbuf != NULL) { OPENSSL_cleanse(mbuf,BUFSIZZ); OPENSSL_free(mbuf); }

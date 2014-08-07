@@ -342,8 +342,7 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *p, unsigned cha
         }
 
 #ifndef OPENSSL_NO_EC
-	if (s->tlsext_ecpointformatlist != NULL &&
-	    s->version != DTLS1_VERSION)
+	if (s->tlsext_ecpointformatlist != NULL)
 		{
 		/* Add TLS extension ECPointFormats to the ClientHello message */
 		long lenmax; 
@@ -362,8 +361,7 @@ unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *p, unsigned cha
 		memcpy(ret, s->tlsext_ecpointformatlist, s->tlsext_ecpointformatlist_length);
 		ret+=s->tlsext_ecpointformatlist_length;
 		}
-	if (s->tlsext_ellipticcurvelist != NULL &&
-	    s->version != DTLS1_VERSION)
+	if (s->tlsext_ellipticcurvelist != NULL)
 		{
 		/* Add TLS extension EllipticCurves to the ClientHello message */
 		long lenmax; 
@@ -546,8 +544,7 @@ unsigned char *ssl_add_serverhello_tlsext(SSL *s, unsigned char *p, unsigned cha
         }
 
 #ifndef OPENSSL_NO_EC
-	if (s->tlsext_ecpointformatlist != NULL &&
-	    s->version != DTLS1_VERSION)
+	if (s->tlsext_ecpointformatlist != NULL)
 		{
 		/* Add TLS extension ECPointFormats to the ServerHello message */
 		long lenmax; 
@@ -625,6 +622,89 @@ unsigned char *ssl_add_serverhello_tlsext(SSL *s, unsigned char *p, unsigned cha
 	return ret;
 	}
 
+#ifndef OPENSSL_NO_EC
+/* ssl_check_for_safari attempts to fingerprint Safari using OS X
+ * SecureTransport using the TLS extension block in |d|, of length |n|.
+ * Safari, since 10.6, sends exactly these extensions, in this order:
+ *   SNI,
+ *   elliptic_curves
+ *   ec_point_formats
+ *
+ * We wish to fingerprint Safari because they broke ECDHE-ECDSA support in 10.8,
+ * but they advertise support. So enabling ECDHE-ECDSA ciphers breaks them.
+ * Sadly we cannot differentiate 10.6, 10.7 and 10.8.4 (which work), from
+ * 10.8..10.8.3 (which don't work).
+ */
+static void ssl_check_for_safari(SSL *s, const unsigned char *data, const unsigned char *d, int n) {
+	unsigned short type, size;
+	static const unsigned char kSafariExtensionsBlock[] = {
+		0x00, 0x0a,  /* elliptic_curves extension */
+		0x00, 0x08,  /* 8 bytes */
+		0x00, 0x06,  /* 6 bytes of curve ids */
+		0x00, 0x17,  /* P-256 */
+		0x00, 0x18,  /* P-384 */
+		0x00, 0x19,  /* P-521 */
+
+		0x00, 0x0b,  /* ec_point_formats */
+		0x00, 0x02,  /* 2 bytes */
+		0x01,        /* 1 point format */
+		0x00,        /* uncompressed */
+	};
+
+	/* The following is only present in TLS 1.2 */
+	static const unsigned char kSafariTLS12ExtensionsBlock[] = {
+		0x00, 0x0d,  /* signature_algorithms */
+		0x00, 0x0c,  /* 12 bytes */
+		0x00, 0x0a,  /* 10 bytes */
+		0x05, 0x01,  /* SHA-384/RSA */
+		0x04, 0x01,  /* SHA-256/RSA */
+		0x02, 0x01,  /* SHA-1/RSA */
+		0x04, 0x03,  /* SHA-256/ECDSA */
+		0x02, 0x03,  /* SHA-1/ECDSA */
+	};
+
+	if (data >= (d+n-2))
+		return;
+	data += 2;
+
+	if (data > (d+n-4))
+		return;
+	n2s(data,type);
+	n2s(data,size);
+
+	if (type != TLSEXT_TYPE_server_name)
+		return;
+
+	if (data+size > d+n)
+		return;
+	data += size;
+
+	if (TLS1_get_client_version(s) >= TLS1_2_VERSION)
+		{
+		const size_t len1 = sizeof(kSafariExtensionsBlock);
+		const size_t len2 = sizeof(kSafariTLS12ExtensionsBlock);
+
+		if (data + len1 + len2 != d+n)
+			return;
+		if (memcmp(data, kSafariExtensionsBlock, len1) != 0)
+			return;
+		if (memcmp(data + len1, kSafariTLS12ExtensionsBlock, len2) != 0)
+			return;
+		}
+	else
+		{
+		const size_t len = sizeof(kSafariExtensionsBlock);
+
+		if (data + len != d+n)
+			return;
+		if (memcmp(data, kSafariExtensionsBlock, len) != 0)
+			return;
+		}
+
+	s->s3->is_probably_safari = 1;
+}
+#endif /* !OPENSSL_NO_EC */
+
 int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, int n, int *al)
 	{
 	unsigned short type;
@@ -635,6 +715,11 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 
 	s->servername_done = 0;
 	s->tlsext_status_type = -1;
+
+#ifndef OPENSSL_NO_EC
+	if (s->options & SSL_OP_SAFARI_ECDHE_ECDSA_BUG)
+		ssl_check_for_safari(s, data, d, n);
+#endif /* !OPENSSL_NO_EC */
 
 	if (data >= (d+n-2))
 		goto ri_check;
@@ -714,12 +799,21 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 				switch (servname_type)
 					{
 				case TLSEXT_NAMETYPE_host_name:
-					if (s->session->tlsext_hostname == NULL)
+					if (!s->hit)
 						{
-						if (len > TLSEXT_MAXLEN_host_name || 
-							((s->session->tlsext_hostname = OPENSSL_malloc(len+1)) == NULL))
+						if(s->session->tlsext_hostname)
+							{
+							*al = SSL_AD_DECODE_ERROR;
+							return 0;
+							}
+						if (len > TLSEXT_MAXLEN_host_name)
 							{
 							*al = TLS1_AD_UNRECOGNIZED_NAME;
+							return 0;
+							}
+						if ((s->session->tlsext_hostname = OPENSSL_malloc(len+1)) == NULL)
+							{
+							*al = TLS1_AD_INTERNAL_ERROR;
 							return 0;
 							}
 						memcpy(s->session->tlsext_hostname, sdata, len);
@@ -734,7 +828,8 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 
 						}
 					else 
-						s->servername_done = strlen(s->session->tlsext_hostname) == len 
+						s->servername_done = s->session->tlsext_hostname
+							&& strlen(s->session->tlsext_hostname) == len 
 							&& strncmp(s->session->tlsext_hostname, (char *)sdata, len) == 0;
 					
 					break;
@@ -754,8 +849,7 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 			}
 
 #ifndef OPENSSL_NO_EC
-		else if (type == TLSEXT_TYPE_ec_point_formats &&
-	             s->version != DTLS1_VERSION)
+		else if (type == TLSEXT_TYPE_ec_point_formats)
 			{
 			unsigned char *sdata = data;
 			int ecpointformatlist_length = *(sdata++);
@@ -765,15 +859,22 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 				*al = TLS1_AD_DECODE_ERROR;
 				return 0;
 				}
-			s->session->tlsext_ecpointformatlist_length = 0;
-			if (s->session->tlsext_ecpointformatlist != NULL) OPENSSL_free(s->session->tlsext_ecpointformatlist);
-			if ((s->session->tlsext_ecpointformatlist = OPENSSL_malloc(ecpointformatlist_length)) == NULL)
+			if (!s->hit)
 				{
-				*al = TLS1_AD_INTERNAL_ERROR;
-				return 0;
+				if(s->session->tlsext_ecpointformatlist)
+					{
+					OPENSSL_free(s->session->tlsext_ecpointformatlist);
+					s->session->tlsext_ecpointformatlist = NULL;
+					}
+				s->session->tlsext_ecpointformatlist_length = 0;
+				if ((s->session->tlsext_ecpointformatlist = OPENSSL_malloc(ecpointformatlist_length)) == NULL)
+					{
+					*al = TLS1_AD_INTERNAL_ERROR;
+					return 0;
+					}
+				s->session->tlsext_ecpointformatlist_length = ecpointformatlist_length;
+				memcpy(s->session->tlsext_ecpointformatlist, sdata, ecpointformatlist_length);
 				}
-			s->session->tlsext_ecpointformatlist_length = ecpointformatlist_length;
-			memcpy(s->session->tlsext_ecpointformatlist, sdata, ecpointformatlist_length);
 #if 0
 			fprintf(stderr,"ssl_parse_clienthello_tlsext s->session->tlsext_ecpointformatlist (length=%i) ", s->session->tlsext_ecpointformatlist_length);
 			sdata = s->session->tlsext_ecpointformatlist;
@@ -782,27 +883,34 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 			fprintf(stderr,"\n");
 #endif
 			}
-		else if (type == TLSEXT_TYPE_elliptic_curves &&
-	             s->version != DTLS1_VERSION)
+		else if (type == TLSEXT_TYPE_elliptic_curves)
 			{
 			unsigned char *sdata = data;
 			int ellipticcurvelist_length = (*(sdata++) << 8);
 			ellipticcurvelist_length += (*(sdata++));
 
-			if (ellipticcurvelist_length != size - 2)
+			if (ellipticcurvelist_length != size - 2 ||
+				ellipticcurvelist_length < 1)
 				{
 				*al = TLS1_AD_DECODE_ERROR;
 				return 0;
 				}
-			s->session->tlsext_ellipticcurvelist_length = 0;
-			if (s->session->tlsext_ellipticcurvelist != NULL) OPENSSL_free(s->session->tlsext_ellipticcurvelist);
-			if ((s->session->tlsext_ellipticcurvelist = OPENSSL_malloc(ellipticcurvelist_length)) == NULL)
+			if (!s->hit)
 				{
-				*al = TLS1_AD_INTERNAL_ERROR;
-				return 0;
+				if(s->session->tlsext_ellipticcurvelist)
+					{
+					*al = TLS1_AD_DECODE_ERROR;
+					return 0;
+					}
+				s->session->tlsext_ellipticcurvelist_length = 0;
+				if ((s->session->tlsext_ellipticcurvelist = OPENSSL_malloc(ellipticcurvelist_length)) == NULL)
+					{
+					*al = TLS1_AD_INTERNAL_ERROR;
+					return 0;
+					}
+				s->session->tlsext_ellipticcurvelist_length = ellipticcurvelist_length;
+				memcpy(s->session->tlsext_ellipticcurvelist, sdata, ellipticcurvelist_length);
 				}
-			s->session->tlsext_ellipticcurvelist_length = ellipticcurvelist_length;
-			memcpy(s->session->tlsext_ellipticcurvelist, sdata, ellipticcurvelist_length);
 #if 0
 			fprintf(stderr,"ssl_parse_clienthello_tlsext s->session->tlsext_ellipticcurvelist (length=%i) ", s->session->tlsext_ellipticcurvelist_length);
 			sdata = s->session->tlsext_ellipticcurvelist;
@@ -859,7 +967,7 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 			renegotiate_seen = 1;
 			}
 		else if (type == TLSEXT_TYPE_status_request &&
-		         s->version != DTLS1_VERSION && s->ctx->tlsext_status_cb)
+		         s->version != DTLS1_VERSION)
 			{
 		
 			if (size < 5) 
@@ -893,6 +1001,7 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 						}
 					n2s(data, idsize);
 					dsize -= 2 + idsize;
+					size -= 2 + idsize;
 					if (dsize < 0)
 						{
 						*al = SSL_AD_DECODE_ERROR;
@@ -931,9 +1040,14 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 					}
 
 				/* Read in request_extensions */
+				if (size < 2)
+					{
+					*al = SSL_AD_DECODE_ERROR;
+					return 0;
+					}
 				n2s(data,dsize);
 				size -= 2;
-				if (dsize > size) 
+				if (dsize != size)
 					{
 					*al = SSL_AD_DECODE_ERROR;
 					return 0;
@@ -941,6 +1055,12 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 				sdata = data;
 				if (dsize > 0)
 					{
+					if (s->tlsext_ocsp_exts)
+						{
+						sk_X509_EXTENSION_pop_free(s->tlsext_ocsp_exts,
+									   X509_EXTENSION_free);
+						}
+
 					s->tlsext_ocsp_exts =
 						d2i_X509_EXTENSIONS(NULL,
 							&sdata, dsize);
@@ -983,9 +1103,9 @@ int ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 
 int ssl_parse_serverhello_tlsext(SSL *s, unsigned char **p, unsigned char *d, int n, int *al)
 	{
+	unsigned short length;
 	unsigned short type;
 	unsigned short size;
-	unsigned short len;  
 	unsigned char *data = *p;
 	int tlsext_servername = 0;
 	int renegotiate_seen = 0;
@@ -993,7 +1113,12 @@ int ssl_parse_serverhello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 	if (data >= (d+n-2))
 		goto ri_check;
 
-	n2s(data,len);
+	n2s(data,length);
+	if (data+length != d+n)
+		{
+		*al = SSL_AD_DECODE_ERROR;
+		return 0;
+		}
 
 	while(data <= (d+n-4))
 		{
@@ -1018,26 +1143,29 @@ int ssl_parse_serverhello_tlsext(SSL *s, unsigned char **p, unsigned char *d, in
 			}
 
 #ifndef OPENSSL_NO_EC
-		else if (type == TLSEXT_TYPE_ec_point_formats &&
-	             s->version != DTLS1_VERSION)
+		else if (type == TLSEXT_TYPE_ec_point_formats)
 			{
 			unsigned char *sdata = data;
 			int ecpointformatlist_length = *(sdata++);
 
-			if (ecpointformatlist_length != size - 1)
+			if (ecpointformatlist_length != size - 1 || 
+				ecpointformatlist_length < 1)
 				{
 				*al = TLS1_AD_DECODE_ERROR;
 				return 0;
 				}
-			s->session->tlsext_ecpointformatlist_length = 0;
-			if (s->session->tlsext_ecpointformatlist != NULL) OPENSSL_free(s->session->tlsext_ecpointformatlist);
-			if ((s->session->tlsext_ecpointformatlist = OPENSSL_malloc(ecpointformatlist_length)) == NULL)
+			if (!s->hit)
 				{
-				*al = TLS1_AD_INTERNAL_ERROR;
-				return 0;
+				s->session->tlsext_ecpointformatlist_length = 0;
+				if (s->session->tlsext_ecpointformatlist != NULL) OPENSSL_free(s->session->tlsext_ecpointformatlist);
+				if ((s->session->tlsext_ecpointformatlist = OPENSSL_malloc(ecpointformatlist_length)) == NULL)
+					{
+					*al = TLS1_AD_INTERNAL_ERROR;
+					return 0;
+					}
+				s->session->tlsext_ecpointformatlist_length = ecpointformatlist_length;
+				memcpy(s->session->tlsext_ecpointformatlist, sdata, ecpointformatlist_length);
 				}
-			s->session->tlsext_ecpointformatlist_length = ecpointformatlist_length;
-			memcpy(s->session->tlsext_ecpointformatlist, sdata, ecpointformatlist_length);
 #if 0
 			fprintf(stderr,"ssl_parse_serverhello_tlsext s->session->tlsext_ecpointformatlist ");
 			sdata = s->session->tlsext_ecpointformatlist;
@@ -1292,7 +1420,7 @@ int ssl_prepare_serverhello_tlsext(SSL *s)
 	return 1;
 	}
 
-int ssl_check_clienthello_tlsext(SSL *s)
+int ssl_check_clienthello_tlsext_early(SSL *s)
 	{
 	int ret=SSL_TLSEXT_ERR_NOACK;
 	int al = SSL_AD_UNRECOGNIZED_NAME;
@@ -1311,42 +1439,12 @@ int ssl_check_clienthello_tlsext(SSL *s)
 	else if (s->initial_ctx != NULL && s->initial_ctx->tlsext_servername_callback != 0) 		
 		ret = s->initial_ctx->tlsext_servername_callback(s, &al, s->initial_ctx->tlsext_servername_arg);
 
-	/* If status request then ask callback what to do.
- 	 * Note: this must be called after servername callbacks in case 
- 	 * the certificate has changed.
- 	 */
-	if ((s->tlsext_status_type != -1) && s->ctx && s->ctx->tlsext_status_cb)
-		{
-		int r;
-		r = s->ctx->tlsext_status_cb(s, s->ctx->tlsext_status_arg);
-		switch (r)
-			{
-			/* We don't want to send a status request response */
-			case SSL_TLSEXT_ERR_NOACK:
-				s->tlsext_status_expected = 0;
-				break;
-			/* status request response should be sent */
-			case SSL_TLSEXT_ERR_OK:
-				if (s->tlsext_ocsp_resp)
-					s->tlsext_status_expected = 1;
-				else
-					s->tlsext_status_expected = 0;
-				break;
-			/* something bad happened */
-			case SSL_TLSEXT_ERR_ALERT_FATAL:
-				ret = SSL_TLSEXT_ERR_ALERT_FATAL;
-				al = SSL_AD_INTERNAL_ERROR;
-				goto err;
-			}
-		}
-	else
-		s->tlsext_status_expected = 0;
-
 #ifdef TLSEXT_TYPE_opaque_prf_input
  	{
 		/* This sort of belongs into ssl_prepare_serverhello_tlsext(),
 		 * but we might be sending an alert in response to the client hello,
-		 * so this has to happen here in ssl_check_clienthello_tlsext(). */
+		 * so this has to happen here in
+		 * ssl_check_clienthello_tlsext_early(). */
 
 		int r = 1;
 	
@@ -1398,8 +1496,8 @@ int ssl_check_clienthello_tlsext(SSL *s)
 			}
 	}
 
-#endif
  err:
+#endif
 	switch (ret)
 		{
 		case SSL_TLSEXT_ERR_ALERT_FATAL:
@@ -1417,29 +1515,91 @@ int ssl_check_clienthello_tlsext(SSL *s)
 		}
 	}
 
+int ssl_check_clienthello_tlsext_late(SSL *s)
+	{
+	int ret = SSL_TLSEXT_ERR_OK;
+	int al;
+
+	/* If status request then ask callback what to do.
+ 	 * Note: this must be called after servername callbacks in case 
+ 	 * the certificate has changed, and must be called after the cipher
+	 * has been chosen because this may influence which certificate is sent
+ 	 */
+	if (s->tlsext_status_type != -1 && s->ctx && s->ctx->tlsext_status_cb)
+		{
+		int r;
+		CERT_PKEY *certpkey;
+		certpkey = ssl_get_server_send_pkey(s);
+		/* If no certificate can't return certificate status */
+		if (certpkey == NULL)
+			{
+			s->tlsext_status_expected = 0;
+			return 1;
+			}
+		/* Set current certificate to one we will use so
+		 * SSL_get_certificate et al can pick it up.
+		 */
+		s->cert->key = certpkey;
+		r = s->ctx->tlsext_status_cb(s, s->ctx->tlsext_status_arg);
+		switch (r)
+			{
+			/* We don't want to send a status request response */
+			case SSL_TLSEXT_ERR_NOACK:
+				s->tlsext_status_expected = 0;
+				break;
+			/* status request response should be sent */
+			case SSL_TLSEXT_ERR_OK:
+				if (s->tlsext_ocsp_resp)
+					s->tlsext_status_expected = 1;
+				else
+					s->tlsext_status_expected = 0;
+				break;
+			/* something bad happened */
+			case SSL_TLSEXT_ERR_ALERT_FATAL:
+				ret = SSL_TLSEXT_ERR_ALERT_FATAL;
+				al = SSL_AD_INTERNAL_ERROR;
+				goto err;
+			}
+		}
+	else
+		s->tlsext_status_expected = 0;
+
+ err:
+	switch (ret)
+		{
+		case SSL_TLSEXT_ERR_ALERT_FATAL:
+			ssl3_send_alert(s, SSL3_AL_FATAL, al); 
+			return -1;
+
+		case SSL_TLSEXT_ERR_ALERT_WARNING:
+			ssl3_send_alert(s, SSL3_AL_WARNING, al);
+			return 1; 
+
+		default:
+			return 1;
+		}
+	}
+
 int ssl_check_serverhello_tlsext(SSL *s)
 	{
 	int ret=SSL_TLSEXT_ERR_NOACK;
 	int al = SSL_AD_UNRECOGNIZED_NAME;
 
 #ifndef OPENSSL_NO_EC
-	/* If we are client and using an elliptic curve cryptography cipher suite, then server
-	 * must return a an EC point formats lists containing uncompressed.
+	/* If we are client and using an elliptic curve cryptography cipher
+	 * suite, then if server returns an EC point formats lists extension
+	 * it must contain uncompressed.
 	 */
 	unsigned long alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 	unsigned long alg_a = s->s3->tmp.new_cipher->algorithm_auth;
 	if ((s->tlsext_ecpointformatlist != NULL) && (s->tlsext_ecpointformatlist_length > 0) && 
+	    (s->session->tlsext_ecpointformatlist != NULL) && (s->session->tlsext_ecpointformatlist_length > 0) && 
 	    ((alg_k & (SSL_kEECDH|SSL_kECDHr|SSL_kECDHe)) || (alg_a & SSL_aECDSA)))
 		{
 		/* we are using an ECC cipher */
 		size_t i;
 		unsigned char *list;
 		int found_uncompressed = 0;
-		if ((s->session->tlsext_ecpointformatlist == NULL) || (s->session->tlsext_ecpointformatlist_length == 0))
-			{
-			SSLerr(SSL_F_SSL_CHECK_SERVERHELLO_TLSEXT,SSL_R_TLS_INVALID_ECPOINTFORMAT_LIST);
-			return -1;
-			}
 		list = s->session->tlsext_ecpointformatlist;
 		for (i = 0; i < s->session->tlsext_ecpointformatlist_length; i++)
 			{
@@ -1669,7 +1829,7 @@ static int tls_decrypt_ticket(SSL *s, const unsigned char *etick, int eticklen,
 	HMAC_Update(&hctx, etick, eticklen);
 	HMAC_Final(&hctx, tick_hmac, NULL);
 	HMAC_CTX_cleanup(&hctx);
-	if (memcmp(tick_hmac, etick + eticklen, mlen))
+	if (CRYPTO_memcmp(tick_hmac, etick + eticklen, mlen))
 		goto tickerr;
 	/* Attempt to decrypt session data */
 	/* Move p after IV to start of encrypted ticket, update length */
@@ -1683,7 +1843,11 @@ static int tls_decrypt_ticket(SSL *s, const unsigned char *etick, int eticklen,
 		}
 	EVP_DecryptUpdate(&ctx, sdec, &slen, p, eticklen);
 	if (EVP_DecryptFinal(&ctx, sdec + slen, &mlen) <= 0)
+		{
+		EVP_CIPHER_CTX_cleanup(&ctx);
+		OPENSSL_free(sdec);
 		goto tickerr;
+		}
 	slen += mlen;
 	EVP_CIPHER_CTX_cleanup(&ctx);
 	p = sdec;

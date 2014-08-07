@@ -500,7 +500,7 @@ void CRYPTO_THREADID_current(CRYPTO_THREADID *id)
 	CRYPTO_THREADID_set_numeric(id, (unsigned long)find_thread(NULL));
 #else
 	/* For everything else, default to using the address of 'errno' */
-	CRYPTO_THREADID_set_pointer(id, &errno);
+	CRYPTO_THREADID_set_pointer(id, (void*)&errno);
 #endif
 	}
 
@@ -731,7 +731,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason,
 	case DLL_THREAD_ATTACH:
 		break;
 	case DLL_THREAD_DETACH:
-		ERR_remove_state(0);
 		break;
 	case DLL_PROCESS_DETACH:
 		break;
@@ -743,6 +742,16 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason,
 #if defined(_WIN32) && !defined(__CYGWIN__)
 #include <tchar.h>
 #include <signal.h>
+#ifdef __WATCOMC__
+#if defined(_UNICODE) || defined(__UNICODE__)
+#define _vsntprintf _vsnwprintf
+#else
+#define _vsntprintf _vsnprintf
+#endif
+#endif
+#ifdef _MSC_VER
+#define alloca _alloca
+#endif
 
 #if defined(_WIN32_WINNT) && _WIN32_WINNT>=0x0333
 int OPENSSL_isservice(void)
@@ -773,11 +782,7 @@ int OPENSSL_isservice(void)
 
     if (len>512) return -1;		/* paranoia */
     len++,len&=~1;			/* paranoia */
-#ifdef _MSC_VER
-    name=(WCHAR *)_alloca(len+sizeof(WCHAR));
-#else
     name=(WCHAR *)alloca(len+sizeof(WCHAR));
-#endif
     if (!GetUserObjectInformationW (h,UOI_NAME,name,len,&len))
 	return -1;
 
@@ -822,11 +827,7 @@ void OPENSSL_showfatal (const char *fmta,...)
       size_t len_0=strlen(fmta)+1,i;
       WCHAR *fmtw;
 
-#ifdef _MSC_VER
-	fmtw = (WCHAR *)_alloca (len_0*sizeof(WCHAR));
-#else
-	fmtw = (WCHAR *)alloca (len_0*sizeof(WCHAR));
-#endif
+	fmtw = (WCHAR *)alloca(len_0*sizeof(WCHAR));
 	if (fmtw == NULL) { fmt=(const TCHAR *)L"no stack?"; break; }
 
 #ifndef OPENSSL_NO_MULTIBYTE
@@ -859,7 +860,7 @@ void OPENSSL_showfatal (const char *fmta,...)
 
 #if defined(_WIN32_WINNT) && _WIN32_WINNT>=0x0333
     /* this -------------v--- guards NT-specific calls */
-    if (GetVersion() < 0x80000000 && OPENSSL_isservice() > 0)
+    if (check_winnt() && OPENSSL_isservice() > 0)
     {	HANDLE h = RegisterEventSource(0,_T("OPENSSL"));
 	const TCHAR *pmsg=buf;
 	ReportEvent(h,EVENTLOG_ERROR_TYPE,0,0,0,1,0,&pmsg,0);
@@ -895,3 +896,16 @@ void OpenSSLDie(const char *file,int line,const char *assertion)
 	}
 
 void *OPENSSL_stderr(void)	{ return stderr; }
+
+int CRYPTO_memcmp(const void *in_a, const void *in_b, size_t len)
+	{
+	size_t i;
+	const unsigned char *a = in_a;
+	const unsigned char *b = in_b;
+	unsigned char x = 0;
+
+	for (i = 0; i < len; i++)
+		x |= a[i] ^ b[i];
+
+	return x;
+	}

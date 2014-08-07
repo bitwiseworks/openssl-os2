@@ -158,6 +158,8 @@ OCSP_REQ_CTX *OCSP_sendreq_new(BIO *io, char *path, OCSP_REQUEST *req,
 
 	OCSP_REQ_CTX *rctx;
 	rctx = OPENSSL_malloc(sizeof(OCSP_REQ_CTX));
+	if (!rctx)
+		return NULL;
 	rctx->state = OHS_ERROR;
 	rctx->mem = BIO_new(BIO_s_mem());
 	rctx->io = io;
@@ -167,18 +169,21 @@ OCSP_REQ_CTX *OCSP_sendreq_new(BIO *io, char *path, OCSP_REQUEST *req,
 	else
 		rctx->iobuflen = OCSP_MAX_LINE_LEN;
 	rctx->iobuf = OPENSSL_malloc(rctx->iobuflen);
-	if (!rctx->iobuf)
-		return 0;
+	if (!rctx->mem || !rctx->iobuf)
+		goto err;
 	if (!path)
 		path = "/";
 
         if (BIO_printf(rctx->mem, post_hdr, path) <= 0)
-		return 0;
+		goto err;
 
 	if (req && !OCSP_REQ_CTX_set1_req(rctx, req))
-		return 0;
+		goto err;
 
 	return rctx;
+	err:
+	OCSP_REQ_CTX_free(rctx);
+	return NULL;
 	}
 
 /* Parse the HTTP response. This will look like this:
@@ -397,11 +402,12 @@ int OCSP_sendreq_nbio(OCSP_RESPONSE **presp, OCSP_REQ_CTX *rctx)
 
 
 		case OHS_ASN1_HEADER:
-		/* Now reading ASN1 header: can read at least 6 bytes which
-		 * is more than enough for any valid ASN1 SEQUENCE header
+		/* Now reading ASN1 header: can read at least 2 bytes which
+		 * is enough for ASN1 SEQUENCE header and either length field
+		 * or at least the length of the length field.
 		 */
 		n = BIO_get_mem_data(rctx->mem, &p);
-		if (n < 6)
+		if (n < 2)
 			goto next_io;
 
 		/* Check it is an ASN1 SEQUENCE */
@@ -414,6 +420,11 @@ int OCSP_sendreq_nbio(OCSP_RESPONSE **presp, OCSP_REQ_CTX *rctx)
 		/* Check out length field */
 		if (*p & 0x80)
 			{
+			/* If MSB set on initial length octet we can now
+			 * always read 6 octets: make sure we have them.
+			 */
+			if (n < 6)
+				goto next_io;
 			n = *p & 0x7F;
 			/* Not NDEF or excessive length */
 			if (!n || (n > 4))
@@ -483,6 +494,9 @@ OCSP_RESPONSE *OCSP_sendreq_bio(BIO *b, char *path, OCSP_REQUEST *req)
 	int rv;
 
 	ctx = OCSP_sendreq_new(b, path, req, -1);
+
+	if (!ctx)
+		return NULL;
 
 	do
 		{

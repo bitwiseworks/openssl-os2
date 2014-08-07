@@ -172,7 +172,6 @@ static const EVP_PKEY_ASN1_METHOD *pkey_asn1_find(int type)
 const EVP_PKEY_ASN1_METHOD *EVP_PKEY_asn1_find(ENGINE **pe, int type)
 	{
 	const EVP_PKEY_ASN1_METHOD *t;
-	ENGINE *e;
 
 	for (;;)
 		{
@@ -184,6 +183,7 @@ const EVP_PKEY_ASN1_METHOD *EVP_PKEY_asn1_find(ENGINE **pe, int type)
 	if (pe)
 		{
 #ifndef OPENSSL_NO_ENGINE
+		ENGINE *e;
 		/* type will contain the final unaliased type */
 		e = ENGINE_get_pkey_asn1_meth_engine(type);
 		if (e)
@@ -256,7 +256,12 @@ int EVP_PKEY_asn1_add_alias(int to, int from)
 	if (!ameth)
 		return 0;
 	ameth->pkey_base_id = to;
-	return EVP_PKEY_asn1_add0(ameth);
+	if (!EVP_PKEY_asn1_add0(ameth))
+		{
+		EVP_PKEY_asn1_free(ameth);
+		return 0;
+		}
+	return 1;
 	}
 
 int EVP_PKEY_asn1_get0_info(int *ppkey_id, int *ppkey_base_id, int *ppkey_flags,

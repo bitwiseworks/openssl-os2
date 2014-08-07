@@ -446,6 +446,7 @@ static void load_builtin_compressions(void)
 						sk_SSL_COMP_push(ssl_comp_methods,comp);
 						}
 					}
+					sk_SSL_COMP_sort(ssl_comp_methods);
 				}
 			MemCheck_on();
 			}
@@ -530,7 +531,7 @@ int ssl_cipher_get_evp(const SSL_SESSION *s, const EVP_CIPHER **enc,
 		break;
 		}
 
-	if ((i < 0) || (i > SSL_ENC_NUM_IDX))
+	if ((i < 0) || (i >= SSL_ENC_NUM_IDX))
 		*enc=NULL;
 	else
 		{
@@ -558,7 +559,7 @@ int ssl_cipher_get_evp(const SSL_SESSION *s, const EVP_CIPHER **enc,
 		i= -1;
 		break;
 		}
-	if ((i < 0) || (i > SSL_MD_NUM_IDX))
+	if ((i < 0) || (i >= SSL_MD_NUM_IDX))
 	{
 		*md=NULL; 
 		if (mac_pkey_type!=NULL) *mac_pkey_type = NID_undef;
@@ -847,7 +848,7 @@ static void ssl_cipher_apply_rule(unsigned long cipher_id,
 		int rule, int strength_bits,
 		CIPHER_ORDER **head_p, CIPHER_ORDER **tail_p)
 	{
-	CIPHER_ORDER *head, *tail, *curr, *curr2, *last;
+	CIPHER_ORDER *head, *tail, *curr, *next, *last;
 	const SSL_CIPHER *cp;
 	int reverse = 0;
 
@@ -864,21 +865,25 @@ static void ssl_cipher_apply_rule(unsigned long cipher_id,
 
 	if (reverse)
 		{
-		curr = tail;
+		next = tail;
 		last = head;
 		}
 	else
 		{
-		curr = head;
+		next = head;
 		last = tail;
 		}
 
-	curr2 = curr;
+	curr = NULL;
 	for (;;)
 		{
-		if ((curr == NULL) || (curr == last)) break;
-		curr = curr2;
-		curr2 = reverse ? curr->prev : curr->next;
+		if (curr == last) break;
+
+		curr = next;
+
+		if (curr == NULL) break;
+
+		next = reverse ? curr->prev : curr->next;
 
 		cp = curr->cipher;
 
@@ -1027,7 +1032,7 @@ static int ssl_cipher_process_rulestr(const char *rule_str,
                 const SSL_CIPHER **ca_list)
 	{
 	unsigned long alg_mkey, alg_auth, alg_enc, alg_mac, alg_ssl, algo_strength;
-	const char *l, *start, *buf;
+	const char *l, *buf;
 	int j, multi, found, rule, retval, ok, buflen;
 	unsigned long cipher_id = 0;
 	char ch;
@@ -1064,7 +1069,6 @@ static int ssl_cipher_process_rulestr(const char *rule_str,
 		alg_ssl = 0;
 		algo_strength = 0;
 
-		start=l;
 		for (;;)
 			{
 			ch = *l;
@@ -1456,7 +1460,7 @@ char *SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	int is_export,pkl,kl;
 	const char *ver,*exp_str;
 	const char *kx,*au,*enc,*mac;
-	unsigned long alg_mkey,alg_auth,alg_enc,alg_mac,alg_ssl,alg2,alg_s;
+	unsigned long alg_mkey,alg_auth,alg_enc,alg_mac,alg_ssl,alg2;
 #ifdef KSSL_DEBUG
 	static const char *format="%-23s %s Kx=%-8s Au=%-4s Enc=%-9s Mac=%-4s%s AL=%lx/%lx/%lx/%lx/%lx\n";
 #else
@@ -1469,7 +1473,6 @@ char *SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	alg_mac = cipher->algorithm_mac;
 	alg_ssl = cipher->algorithm_ssl;
 
-	alg_s=cipher->algo_strength;
 	alg2=cipher->algorithm2;
 
 	is_export=SSL_C_IS_EXPORT(cipher);
@@ -1513,6 +1516,9 @@ char *SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	case SSL_kPSK:
 		kx="PSK";
 		break;
+	case SSL_kGOST:
+		kx="GOST";
+		break;
 	default:
 		kx="unknown";
 		}
@@ -1542,6 +1548,12 @@ char *SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		break;
 	case SSL_aPSK:
 		au="PSK";
+		break;
+	case SSL_aGOST94:
+		au="GOST94";
+		break;
+	case SSL_aGOST01:
+		au="GOST01";
 		break;
 	default:
 		au="unknown";
@@ -1584,6 +1596,9 @@ char *SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	case SSL_SEED:
 		enc="SEED(128)";
 		break;
+	case SSL_eGOST2814789CNT:
+		enc="GOST89(256)";
+		break;
 	default:
 		enc="unknown";
 		break;
@@ -1596,6 +1611,12 @@ char *SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		break;
 	case SSL_SHA1:
 		mac="SHA1";
+		break;
+	case SSL_GOST89MAC:
+		mac="GOST89";
+		break;
+	case SSL_GOST94:
+		mac="GOST94";
 		break;
 	default:
 		mac="unknown";

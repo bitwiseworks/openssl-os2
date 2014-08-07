@@ -556,7 +556,6 @@ bad:
 	if (reqfile)
 		{
 		EVP_PKEY *pkey;
-		X509_CINF *ci;
 		BIO *in;
 
 		if (!sign_flag && !CA_flag)
@@ -624,7 +623,6 @@ bad:
 		print_name(bio_err, "subject=", X509_REQ_get_subject_name(req), nmflag);
 
 		if ((x=X509_new()) == NULL) goto end;
-		ci=x->cert_info;
 
 		if (sno == NULL)
 			{
@@ -989,7 +987,7 @@ bad:
 				else
 					{
 					pk=load_key(bio_err,
-						keyfile, FORMAT_PEM, 0,
+						keyfile, keyformat, 0,
 						passin, e, "request key");
 					if (pk == NULL) goto end;
 					}

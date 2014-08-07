@@ -62,12 +62,8 @@ my $flavour = shift;
 my $output  = shift;
 if ($flavour =~ /\./) { $output = $flavour; undef $flavour; }
 
-{ my ($stddev,$stdino,@junk)=stat(STDOUT);
-  my ($outdev,$outino,@junk)=stat($output);
-
-    open STDOUT,">$output" || die "can't open $output: $!"
-	if ($stddev!=$outdev || $stdino!=$outino);
-}
+open STDOUT,">$output" || die "can't open $output: $!"
+	if (defined($output));
 
 my $gas=1;	$gas=0 if ($output =~ /\.asm$/);
 my $elf=1;	$elf=0 if (!$gas);
@@ -167,7 +163,7 @@ my %globals;
 	    } elsif ($self->{op} =~ /^(pop|push)f/) {
 		$self->{op} .= $self->{sz};
 	    } elsif ($self->{op} eq "call" && $current_segment eq ".CRT\$XCU") {
-		$self->{op} = "ALIGN\t8\n\tDQ";
+		$self->{op} = "\tDQ";
 	    } 
 	    $self->{op};
 	}
@@ -545,6 +541,8 @@ my %globals;
 					if ($line=~/\.([px])data/) {
 					    $v.=" rdata align=";
 					    $v.=$1 eq "p"? 4 : 8;
+					} elsif ($line=~/\.CRT\$/i) {
+					    $v.=" rdata align=8";
 					}
 				    } else {
 					$v="$current_segment\tENDS\n" if ($current_segment);
@@ -552,6 +550,9 @@ my %globals;
 					if ($line=~/\.([px])data/) {
 					    $v.=" READONLY";
 					    $v.=" ALIGN(".($1 eq "p" ? 4 : 8).")" if ($masm>=$masmref);
+					} elsif ($line=~/\.CRT\$/i) {
+					    $v.=" READONLY ";
+					    $v.=$masm>=$masmref ? "ALIGN(8)" : "DWORD";
 					}
 				    }
 				    $current_segment = $line;
