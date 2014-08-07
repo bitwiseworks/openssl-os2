@@ -6,7 +6,8 @@ Release: 1
 
 Summary: Secure Sockets Layer and cryptography libraries and tools
 Name: openssl
-Version: 1.0.0n
+#Version: %{libmaj}.%{libmin}.%{librel}
+Version: 1.0.1i
 Source0: ftp://ftp.openssl.org/source/%{name}-%{version}.tar.gz
 License: OpenSSL
 Group: System Environment/Libraries

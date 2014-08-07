@@ -136,6 +136,7 @@ int MAIN(int argc, char **argv)
 	char *engine=NULL;
 #endif
 	unsigned char *secret_key = NULL, *secret_keyid = NULL;
+	unsigned char *pwri_pass = NULL, *pwri_tmp = NULL;
 	size_t secret_keylen = 0, secret_keyidlen = 0;
 
 	ASN1_OBJECT *econtent_type = NULL;
@@ -327,6 +328,13 @@ int MAIN(int argc, char **argv)
 				goto argerr;
 				}
 			secret_keyidlen = (size_t)ltmp;
+			}
+		else if (!strcmp(*args,"-pwri_password"))
+			{
+			if (!args[1])
+				goto argerr;
+			args++;
+			pwri_pass = (unsigned char *)*args;
 			}
 		else if (!strcmp(*args,"-econtent_type"))
 			{
@@ -561,7 +569,7 @@ int MAIN(int argc, char **argv)
 
 	else if (operation == SMIME_DECRYPT)
 		{
-		if (!recipfile && !keyfile && !secret_key)
+		if (!recipfile && !keyfile && !secret_key && !pwri_pass)
 			{
 			BIO_printf(bio_err, "No recipient certificate or key specified\n");
 			badarg = 1;
@@ -569,7 +577,7 @@ int MAIN(int argc, char **argv)
 		}
 	else if (operation == SMIME_ENCRYPT)
 		{
-		if (!*args && !secret_key)
+		if (!*args && !secret_key && !pwri_pass)
 			{
 			BIO_printf(bio_err, "No recipient(s) certificate(s) specified\n");
 			badarg = 1;
@@ -919,6 +927,17 @@ int MAIN(int argc, char **argv)
 			secret_key = NULL;
 			secret_keyid = NULL;
 			}
+		if (pwri_pass)
+			{
+			pwri_tmp = (unsigned char *)BUF_strdup((char *)pwri_pass);
+			if (!pwri_tmp)
+				goto end;
+			if (!CMS_add0_recipient_password(cms,
+						-1, NID_undef, NID_undef,
+						 pwri_tmp, -1, NULL))
+				goto end;
+			pwri_tmp = NULL;
+			}
 		if (!(flags & CMS_STREAM))
 			{
 			if (!CMS_final(cms, in, NULL, flags))
@@ -1047,6 +1066,16 @@ int MAIN(int argc, char **argv)
 				}
 			}
 
+		if (pwri_pass)
+			{
+			if (!CMS_decrypt_set1_password(cms, pwri_pass, -1))
+				{
+				BIO_puts(bio_err,
+					"Error decrypting CMS using password\n");
+				goto end;
+				}
+			}
+
 		if (!CMS_decrypt(cms, NULL, NULL, indata, out, flags))
 			{
 			BIO_printf(bio_err, "Error decrypting CMS structure\n");
@@ -1171,6 +1200,8 @@ end:
 		OPENSSL_free(secret_key);
 	if (secret_keyid)
 		OPENSSL_free(secret_keyid);
+	if (pwri_tmp)
+		OPENSSL_free(pwri_tmp);
 	if (econtent_type)
 		ASN1_OBJECT_free(econtent_type);
 	if (rr)
