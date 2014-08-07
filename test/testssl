@@ -120,7 +120,7 @@ echo test sslv2/sslv3 with both client and server authentication via BIO pair an
 $ssltest -bio_pair -server_auth -client_auth -app_verify $CA $extra || exit 1
 
 echo "Testing ciphersuites"
-for protocol in SSLv3; do
+for protocol in TLSv1.2 SSLv3; do
   echo "Testing ciphersuites for $protocol"
   for cipher in `../util/shlib_wrap.sh ../apps/openssl ciphers "RSA+$protocol" | tr ':' ' '`; do
     echo "Testing $cipher"
@@ -164,5 +164,15 @@ $ssltest -tls1 -cipher PSK -psk abc123 $extra || exit 1
 
 echo test tls1 with PSK via BIO pair
 $ssltest -bio_pair -tls1 -cipher PSK -psk abc123 $extra || exit 1
+
+if ../util/shlib_wrap.sh ../apps/openssl no-srp; then
+  echo skipping SRP tests
+else
+  echo test tls1 with SRP
+  $ssltest -tls1 -cipher SRP -srpuser test -srppass abc123
+
+  echo test tls1 with SRP via BIO pair
+  $ssltest -bio_pair -tls1 -cipher SRP -srpuser test -srppass abc123
+fi
 
 exit 0

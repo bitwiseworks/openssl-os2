@@ -270,6 +270,11 @@ int ASN1_UTCTIME_cmp_time_t(const ASN1_UTCTIME *s, time_t t)
 	t -= offset*60; /* FIXME: may overflow in extreme cases */
 
 	tm = OPENSSL_gmtime(&t, &data);
+	/* NB: -1, 0, 1 already valid return values so use -2 to
+	 * indicate error.
+	 */
+	if (tm == NULL)
+		return -2;
 	
 #define return_cmp(a,b) if ((a)<(b)) return -1; else if ((a)>(b)) return 1
 	year = g2(s->data);
