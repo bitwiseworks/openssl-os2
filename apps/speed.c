@@ -108,8 +108,14 @@
 #include <signal.h>
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
 #include <windows.h>
+# if defined(__CYGWIN__) && !defined(_WIN32)
+  /* <windows.h> should define _WIN32, which normally is mutually
+   * exclusive with __CYGWIN__, but if it didn't... */
+#  define _WIN32
+  /* this is done because Cygwin alarm() fails sometimes. */
+# endif
 #endif
 
 #include <openssl/bn.h>
@@ -183,6 +189,25 @@
 #ifndef OPENSSL_NO_ECDH
 #include <openssl/ecdh.h>
 #endif
+#include <openssl/modes.h>
+
+#ifdef OPENSSL_FIPS
+#ifdef OPENSSL_DOING_MAKEDEPEND
+#undef AES_set_encrypt_key
+#undef AES_set_decrypt_key
+#undef DES_set_key_unchecked
+#endif
+#define BF_set_key	private_BF_set_key
+#define CAST_set_key	private_CAST_set_key
+#define idea_set_encrypt_key	private_idea_set_encrypt_key
+#define SEED_set_key	private_SEED_set_key
+#define RC2_set_key	private_RC2_set_key
+#define RC4_set_key	private_RC4_set_key
+#define DES_set_key_unchecked	private_DES_set_key_unchecked
+#define AES_set_encrypt_key	private_AES_set_encrypt_key
+#define AES_set_decrypt_key	private_AES_set_decrypt_key
+#define Camellia_set_key	private_Camellia_set_key
+#endif
 
 #ifndef HAVE_FORK
 # if defined(OPENSSL_SYS_VMS) || defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_MACINTOSH_CLASSIC) || defined(OPENSSL_SYS_OS2) || defined(OPENSSL_SYS_NETWARE)
@@ -214,7 +239,7 @@ static void print_result(int alg,int run_no,int count,double time_used);
 static int do_multi(int multi);
 #endif
 
-#define ALGOR_NUM	29
+#define ALGOR_NUM	30
 #define SIZE_NUM	5
 #define RSA_NUM		4
 #define DSA_NUM		3
@@ -229,7 +254,7 @@ static const char *names[ALGOR_NUM]={
   "aes-128 cbc","aes-192 cbc","aes-256 cbc",
   "camellia-128 cbc","camellia-192 cbc","camellia-256 cbc",
   "evp","sha256","sha512","whirlpool",
-  "aes-128 ige","aes-192 ige","aes-256 ige"};
+  "aes-128 ige","aes-192 ige","aes-256 ige","ghash" };
 static double results[ALGOR_NUM][SIZE_NUM];
 static int lengths[SIZE_NUM]={16,64,256,1024,8*1024};
 #ifndef OPENSSL_NO_RSA
@@ -273,9 +298,12 @@ static SIGRETTYPE sig_done(int sig)
 
 #if defined(_WIN32)
 
-#define SIGALRM
+#if !defined(SIGALRM)
+# define SIGALRM
+#endif
 static unsigned int lapse,schlock;
-static void alarm(unsigned int secs) { lapse = secs*1000; }
+static void alarm_win32(unsigned int secs) { lapse = secs*1000; }
+#define alarm alarm_win32
 
 static DWORD WINAPI sleepy(VOID *arg)
 	{
@@ -334,9 +362,6 @@ int MAIN(int, char **);
 
 int MAIN(int argc, char **argv)
 	{
-#ifndef OPENSSL_NO_ENGINE
-	ENGINE *e = NULL;
-#endif
 	unsigned char *buf=NULL,*buf2=NULL;
 	int mret=1;
 	long count=0,save_count=0;
@@ -430,7 +455,6 @@ int MAIN(int argc, char **argv)
 	unsigned char DES_iv[8];
 	unsigned char iv[2*MAX_BLOCK_SIZE/8];
 #ifndef OPENSSL_NO_DES
-	DES_cblock *buf_as_des_cblock = NULL;
 	static DES_cblock key ={0x12,0x34,0x56,0x78,0x9a,0xbc,0xde,0xf0};
 	static DES_cblock key2={0x34,0x56,0x78,0x9a,0xbc,0xde,0xf0,0x12};
 	static DES_cblock key3={0x56,0x78,0x9a,0xbc,0xde,0xf0,0x12,0x34};
@@ -473,6 +497,7 @@ int MAIN(int argc, char **argv)
 #define D_IGE_128_AES   26
 #define D_IGE_192_AES   27
 #define D_IGE_256_AES   28
+#define D_GHASH		29
 	double d=0.0;
 	long c[ALGOR_NUM][SIZE_NUM];
 #define	R_DSA_512	0
@@ -644,9 +669,6 @@ int MAIN(int argc, char **argv)
 		BIO_printf(bio_err,"out of memory\n");
 		goto end;
 		}
-#ifndef OPENSSL_NO_DES
-	buf_as_des_cblock = (DES_cblock *)buf;
-#endif
 	if ((buf2=(unsigned char *)OPENSSL_malloc((int)BUFSIZE)) == NULL)
 		{
 		BIO_printf(bio_err,"out of memory\n");
@@ -721,7 +743,7 @@ int MAIN(int argc, char **argv)
 				BIO_printf(bio_err,"no engine given\n");
 				goto end;
 				}
-                        e = setup_engine(bio_err, *argv, 0);
+                        setup_engine(bio_err, *argv, 0);
 			/* j will be increased again further down.  We just
 			   don't want speed to confuse an engine with an
 			   algorithm, especially when none is given (which
@@ -900,6 +922,10 @@ int MAIN(int argc, char **argv)
 			doit[D_CBC_128_AES]=1;
 			doit[D_CBC_192_AES]=1;
 			doit[D_CBC_256_AES]=1;
+			}
+		else if (strcmp(*argv,"ghash") == 0)
+			{
+			doit[D_GHASH]=1;
 			}
 		else
 #endif
@@ -1237,7 +1263,8 @@ int MAIN(int argc, char **argv)
 		count*=2;
 		Time_F(START);
 		for (it=count; it; it--)
-			DES_ecb_encrypt(buf_as_des_cblock,buf_as_des_cblock,
+			DES_ecb_encrypt((DES_cblock *)buf,
+				(DES_cblock *)buf,
 				&sch,DES_ENCRYPT);
 		d=Time_F(STOP);
 		} while (d <3);
@@ -1270,6 +1297,7 @@ int MAIN(int argc, char **argv)
 	c[D_IGE_128_AES][0]=count;
 	c[D_IGE_192_AES][0]=count;
 	c[D_IGE_256_AES][0]=count;
+	c[D_GHASH][0]=count;
 
 	for (i=1; i<SIZE_NUM; i++)
 		{
@@ -1464,7 +1492,7 @@ int MAIN(int argc, char **argv)
 # error "You cannot disable DES on systems without SIGALRM."
 #endif /* OPENSSL_NO_DES */
 #else
-#define COND(c)	(run)
+#define COND(c)	(run && count<0x7fffffff)
 #define COUNT(d) (count)
 #ifndef _WIN32
 	signal(SIGALRM,sig_done);
@@ -1760,7 +1788,22 @@ int MAIN(int argc, char **argv)
 			print_result(D_IGE_256_AES,j,count,d);
 			}
 		}
+	if (doit[D_GHASH])
+		{
+		GCM128_CONTEXT *ctx = CRYPTO_gcm128_new(&aes_ks1,(block128_f)AES_encrypt);
+		CRYPTO_gcm128_setiv (ctx,(unsigned char *)"0123456789ab",12);
 
+		for (j=0; j<SIZE_NUM; j++)
+			{
+			print_message(names[D_GHASH],c[D_GHASH][j],lengths[j]);
+			Time_F(START);
+			for (count=0,run=1; COND(c[D_GHASH][j]); count++)
+				CRYPTO_gcm128_aad(ctx,buf,lengths[j]);
+			d=Time_F(STOP);
+			print_result(D_GHASH,j,count,d);
+			}
+		CRYPTO_gcm128_release(ctx);
+		}
 
 #endif
 #ifndef OPENSSL_NO_CAMELLIA
@@ -2554,7 +2597,7 @@ static void pkey_print_message(const char *str, const char *str2, long num,
 	BIO_printf(bio_err,mr ? "+DTP:%d:%s:%s:%d\n"
 			   : "Doing %d bit %s %s's for %ds: ",bits,str,str2,tm);
 	(void)BIO_flush(bio_err);
-	alarm(RSA_SECONDS);
+	alarm(tm);
 #else
 	BIO_printf(bio_err,mr ? "+DNP:%ld:%d:%s:%s\n"
 			   : "Doing %ld %d bit %s %s's: ",num,bits,str,str2);
@@ -2614,7 +2657,11 @@ static int do_multi(int multi)
 	fds=malloc(multi*sizeof *fds);
 	for(n=0 ; n < multi ; ++n)
 		{
-		pipe(fd);
+		if (pipe(fd) == -1)
+			{
+			fprintf(stderr, "pipe failure\n");
+			exit(1);
+			}
 		fflush(stdout);
 		fflush(stderr);
 		if(fork())
@@ -2626,7 +2673,11 @@ static int do_multi(int multi)
 			{
 			close(fd[0]);
 			close(1);
-			dup(fd[1]);
+			if (dup(fd[1]) == -1)
+				{
+				fprintf(stderr, "dup failed\n");
+				exit(1);
+				}
 			close(fd[1]);
 			mr=1;
 			usertime=0;
@@ -2709,6 +2760,7 @@ static int do_multi(int multi)
 				else
 					rsa_results[k][1]=d;
 				}
+#ifndef OPENSSL_NO_DSA
 			else if(!strncmp(buf,"+F3:",4))
 				{
 				int k;
@@ -2730,6 +2782,7 @@ static int do_multi(int multi)
 				else
 					dsa_results[k][1]=d;
 				}
+#endif
 #ifndef OPENSSL_NO_ECDSA
 			else if(!strncmp(buf,"+F4:",4))
 				{

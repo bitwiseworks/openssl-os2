@@ -57,7 +57,9 @@
  */
 
 /* We need to define this to get macros like S_IFBLK and S_IFCHR */
+#if !defined(OPENSSL_SYS_VXWORKS)
 #define _XOPEN_SOURCE 500
+#endif
 
 #include <errno.h>
 #include <stdio.h>
@@ -77,6 +79,7 @@
 #endif
 #ifndef OPENSSL_NO_POSIX_IO
 # include <sys/stat.h>
+# include <fcntl.h>
 #endif
 
 #ifdef _WIN32
@@ -137,14 +140,16 @@ int RAND_load_file(const char *file, long bytes)
 	in=fopen(file,"rb");
 #endif
 	if (in == NULL) goto err;
-#if defined(S_IFBLK) && defined(S_IFCHR) && !defined(OPNESSL_NO_POSIX_IO)
+#if defined(S_IFBLK) && defined(S_IFCHR) && !defined(OPENSSL_NO_POSIX_IO)
 	if (sb.st_mode & (S_IFBLK | S_IFCHR)) {
 	  /* this file is a device. we don't want read an infinite number
 	   * of bytes from a random device, nor do we want to use buffered
 	   * I/O because we will waste system entropy. 
 	   */
 	  bytes = (bytes == -1) ? 2048 : bytes; /* ok, is 2048 enough? */
+#ifndef OPENSSL_NO_SETVBUF_IONBF
 	  setvbuf(in, NULL, _IONBF, 0); /* don't do buffered reads */
+#endif /* ndef OPENSSL_NO_SETVBUF_IONBF */
 	}
 #endif
 	for (;;)
@@ -269,7 +274,6 @@ err:
 const char *RAND_file_name(char *buf, size_t size)
 	{
 	char *s=NULL;
-	int ok = 0;
 #ifdef __OpenBSD__
 	struct stat sb;
 #endif
@@ -298,7 +302,6 @@ const char *RAND_file_name(char *buf, size_t size)
 			BUF_strlcat(buf,"/",size);
 #endif
 			BUF_strlcat(buf,RFILE,size);
-			ok = 1;
 			}
 		else
 		  	buf[0] = '\0'; /* no file name */
@@ -312,7 +315,7 @@ const char *RAND_file_name(char *buf, size_t size)
 	 * to something hopefully decent if that isn't available. 
 	 */
 
-	if (!ok)
+	if (!buf[0])
 		if (BUF_strlcpy(buf,"/dev/arandom",size) >= size) {
 			return(NULL);
 		}	

@@ -391,7 +391,7 @@ foreach $lib (keys %csrc)
 	} else {
 	    push @out,
 "/* ====================================================================\n",
-" * Copyright (c) 2001-2010 The OpenSSL Project.  All rights reserved.\n",
+" * Copyright (c) 2001-2011 The OpenSSL Project.  All rights reserved.\n",
 " *\n",
 " * Redistribution and use in source and binary forms, with or without\n",
 " * modification, are permitted provided that the following conditions\n",
@@ -576,7 +576,7 @@ EOF
 	print OUT <<"EOF";
 /* $cfile */
 /* ====================================================================
- * Copyright (c) 1999-2010 The OpenSSL Project.  All rights reserved.
+ * Copyright (c) 1999-2011 The OpenSSL Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -769,7 +769,7 @@ EOF
 	undef %err_reason_strings;
 }
 
-if($debug && defined(%notrans)) {
+if($debug && %notrans) {
 	print STDERR "The following function codes were not translated:\n";
 	foreach(sort keys %notrans)
 	{
@@ -787,7 +787,7 @@ foreach (keys %rcodes) {
 	push (@runref, $_) unless exists $urcodes{$_};
 }
 
-if($debug && defined(@funref) ) {
+if($debug && @funref) {
 	print STDERR "The following function codes were not referenced:\n";
 	foreach(sort @funref)
 	{
@@ -795,7 +795,7 @@ if($debug && defined(@funref) ) {
 	}
 }
 
-if($debug && defined(@runref) ) {
+if($debug && @runref) {
 	print STDERR "The following reason codes were not referenced:\n";
 	foreach(sort @runref)
 	{

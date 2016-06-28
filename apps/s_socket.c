@@ -238,11 +238,10 @@ int init_client(int *sock, char *host, int port, int type)
 	{
 	unsigned char ip[4];
 
+	memset(ip, '\0', sizeof ip);
 	if (!host_ip(host,&(ip[0])))
-		{
-		return(0);
-		}
-	return(init_client_ip(sock,ip,port,type));
+		return 0;
+	return init_client_ip(sock,ip,port,type);
 	}
 
 static int init_client_ip(int *sock, unsigned char ip[4], int port, int type)
@@ -275,7 +274,7 @@ static int init_client_ip(int *sock, unsigned char ip[4], int port, int type)
 		{
 		i=0;
 		i=setsockopt(s,SOL_SOCKET,SO_KEEPALIVE,(char *)&i,sizeof(i));
-		if (i < 0) { perror("keepalive"); return(0); }
+		if (i < 0) { closesocket(s); perror("keepalive"); return(0); }
 		}
 #endif
 
@@ -327,7 +326,7 @@ static int init_server_long(int *sock, int port, char *ip, int type)
 	{
 	int ret=0;
 	struct sockaddr_in server;
-	int s= -1,i;
+	int s= -1;
 
 	if (!ssl_sock_init()) return(0);
 
@@ -366,7 +365,6 @@ static int init_server_long(int *sock, int port, char *ip, int type)
 		}
 	/* Make it 128 for linux */
 	if (type==SOCK_STREAM && listen(s,128) == -1) goto err;
-	i=0;
 	*sock=s;
 	ret=1;
 err:
@@ -384,7 +382,7 @@ static int init_server(int *sock, int port, int type)
 
 static int do_accept(int acc_sock, int *sock, char **host)
 	{
-	int ret,i;
+	int ret;
 	struct hostent *h1,*h2;
 	static struct sockaddr_in from;
 	int len;
@@ -407,6 +405,7 @@ redoit:
 	if (ret == INVALID_SOCKET)
 		{
 #if defined(OPENSSL_SYS_WINDOWS) || (defined(OPENSSL_SYS_NETWARE) && !defined(NETWARE_BSDSOCK))
+		int i;
 		i=WSAGetLastError();
 		BIO_printf(bio_err,"accept error %d\n",i);
 #else
@@ -451,6 +450,7 @@ redoit:
 		if ((*host=(char *)OPENSSL_malloc(strlen(h1->h_name)+1)) == NULL)
 			{
 			perror("OPENSSL_malloc");
+			closesocket(ret);
 			return(0);
 			}
 		BUF_strlcpy(*host,h1->h_name,strlen(h1->h_name)+1);
@@ -459,12 +459,13 @@ redoit:
 		if (h2 == NULL)
 			{
 			BIO_printf(bio_err,"gethostbyname failure\n");
+			closesocket(ret);
 			return(0);
 			}
-		i=0;
 		if (h2->h_addrtype != AF_INET)
 			{
 			BIO_printf(bio_err,"gethostbyname addr is not AF_INET\n");
+			closesocket(ret);
 			return(0);
 			}
 		}

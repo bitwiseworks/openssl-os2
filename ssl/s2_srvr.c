@@ -403,13 +403,14 @@ static int get_client_master_key(SSL *s)
 		p+=3;
 		n2s(p,i); s->s2->tmp.clear=i;
 		n2s(p,i); s->s2->tmp.enc=i;
-		n2s(p,i); s->session->key_arg_length=i;
-		if(s->session->key_arg_length > SSL_MAX_KEY_ARG_LENGTH)
+		n2s(p,i);
+		if(i > SSL_MAX_KEY_ARG_LENGTH)
 			{
 			ssl2_return_error(s,SSL2_PE_UNDEFINED_ERROR);
 			SSLerr(SSL_F_GET_CLIENT_MASTER_KEY, SSL_R_KEY_ARG_TOO_LONG);
 			return -1;
 			}
+		s->session->key_arg_length=i;
 		s->state=SSL2_ST_GET_CLIENT_MASTER_KEY_B;
 		}
 
@@ -697,7 +698,6 @@ static int server_hello(SSL *s)
 	{
 	unsigned char *p,*d;
 	int n,hit;
-	STACK_OF(SSL_CIPHER) *sk;
 
 	p=(unsigned char *)s->init_buf->data;
 	if (s->state == SSL2_ST_SEND_SERVER_HELLO_A)
@@ -778,7 +778,6 @@ static int server_hello(SSL *s)
 			
 			/* lets send out the ciphers we like in the
 			 * prefered order */
-			sk= s->session->ciphers;
 			n=ssl_cipher_list_to_bytes(s,s->session->ciphers,d,0);
 			d+=n;
 			s2n(n,p);		/* add cipher length */
@@ -1060,10 +1059,12 @@ static int request_certificate(SSL *s)
 		EVP_PKEY *pkey=NULL;
 
 		EVP_MD_CTX_init(&ctx);
-		EVP_VerifyInit_ex(&ctx,s->ctx->rsa_md5, NULL);
-		EVP_VerifyUpdate(&ctx,s->s2->key_material,
-				 s->s2->key_material_length);
-		EVP_VerifyUpdate(&ctx,ccd,SSL2_MIN_CERT_CHALLENGE_LENGTH);
+		if (!EVP_VerifyInit_ex(&ctx,s->ctx->rsa_md5, NULL)
+		    || !EVP_VerifyUpdate(&ctx,s->s2->key_material,
+					 s->s2->key_material_length)
+		    || !EVP_VerifyUpdate(&ctx,ccd,
+					 SSL2_MIN_CERT_CHALLENGE_LENGTH))
+			goto msg_end;
 
 		i=i2d_X509(s->cert->pkeys[SSL_PKEY_RSA_ENC].x509,NULL);
 		buf2=OPENSSL_malloc((unsigned int)i);
@@ -1074,7 +1075,11 @@ static int request_certificate(SSL *s)
 			}
 		p2=buf2;
 		i=i2d_X509(s->cert->pkeys[SSL_PKEY_RSA_ENC].x509,&p2);
-		EVP_VerifyUpdate(&ctx,buf2,(unsigned int)i);
+		if (!EVP_VerifyUpdate(&ctx,buf2,(unsigned int)i))
+			{
+			OPENSSL_free(buf2);
+			goto msg_end;
+			}
 		OPENSSL_free(buf2);
 
 		pkey=X509_get_pubkey(x509);
