@@ -120,7 +120,7 @@ install:
 				*DSO_DLFCN*)	sfx=`expr "$(SHLIB_EXT)" : '.*\(\.[a-z][a-z]*\)' \| ".so"`;;	\
 				*DSO_DL*)	sfx=".sl";;	\
 				*DSO_WIN32*)	sfx="eay32.dll"; pfx=;;	\
-				*DSO_OS2*)	sfx="10.dll"; pfx=;; \
+				*DSO_OS2*)	sfx="$(SHLIB_EXT)"; pfx=;; \
 				*)		sfx=".bad";;	\
 				esac; \
 				cp $$pfx$$l$$sfx $(INSTALL_PREFIX)$(INSTALLTOP)/$(LIBDIR)/engines/$$pfx$$l$$sfx.new; \
