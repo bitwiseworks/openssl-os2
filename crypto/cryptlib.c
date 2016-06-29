@@ -653,7 +653,11 @@ const char *CRYPTO_get_lock_name(int type)
         defined(__x86_64) || defined(__x86_64__) || \
         defined(_M_AMD64) || defined(_M_X64)
 
+#ifdef __OS2__
+unsigned int OPENSSL_ia32cap_P[4];
+#else
 extern unsigned int OPENSSL_ia32cap_P[4];
+#endif
 unsigned long *OPENSSL_ia32cap_loc(void)
 {
     if (sizeof(long) == 4)
