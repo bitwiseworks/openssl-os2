@@ -7,7 +7,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -59,23 +59,23 @@
 
 #ifdef OPENSSL_SYS_OS2
 
-#define INCL_DOSPROCESS
-#define INCL_DOSPROFILE
-#define INCL_DOSMISC
-#define INCL_DOSMODULEMGR
-#include <os2.h>
+# define INCL_DOSPROCESS
+# define INCL_DOSPROFILE
+# define INCL_DOSMISC
+# define INCL_DOSMODULEMGR
+# include <os2.h>
 
-#define   CMD_KI_ENABLE   (0x60)
-#define   CMD_KI_RDCNT    (0x63)
+# define   CMD_KI_ENABLE   (0x60)
+# define   CMD_KI_RDCNT    (0x63)
 
 typedef struct _CPUUTIL {
-    ULONG ulTimeLow;            /* Low 32 bits of time stamp      */
-    ULONG ulTimeHigh;           /* High 32 bits of time stamp     */
-    ULONG ulIdleLow;            /* Low 32 bits of idle time       */
-    ULONG ulIdleHigh;           /* High 32 bits of idle time      */
-    ULONG ulBusyLow;            /* Low 32 bits of busy time       */
-    ULONG ulBusyHigh;           /* High 32 bits of busy time      */
-    ULONG ulIntrLow;            /* Low 32 bits of interrupt time  */
+    ULONG ulTimeLow;            /* Low 32 bits of time stamp */
+    ULONG ulTimeHigh;           /* High 32 bits of time stamp */
+    ULONG ulIdleLow;            /* Low 32 bits of idle time */
+    ULONG ulIdleHigh;           /* High 32 bits of idle time */
+    ULONG ulBusyLow;            /* Low 32 bits of busy time */
+    ULONG ulBusyHigh;           /* High 32 bits of busy time */
+    ULONG ulIntrLow;            /* Low 32 bits of interrupt time */
     ULONG ulIntrHigh;           /* High 32 bits of interrupt time */
 } CPUUTIL;
 
@@ -109,12 +109,16 @@ int RAND_poll(void)
     DosTmrQueryTime(&qwTime);
     RAND_add(&qwTime, sizeof(qwTime), 2);
 
-    /* Sample a bunch of system variables, includes various process & memory statistics */
+    /*
+     * Sample a bunch of system variables, includes various process & memory
+     * statistics
+     */
     DosQuerySysInfo(1, QSV_FOREGROUND_PROCESS, SysVars, sizeof(SysVars));
     RAND_add(SysVars, sizeof(SysVars), 4);
 
-    /* If available, sample CPU registers that count at CPU MHz
-     * Only fairly new CPUs (PPro & K6 onwards) & OS/2 versions support this
+    /*
+     * If available, sample CPU registers that count at CPU MHz Only fairly
+     * new CPUs (PPro & K6 onwards) & OS/2 versions support this
      */
     if (use_dosperfsyscall) {
         static volatile int perfsyscall_initcount = 0;
@@ -148,7 +152,10 @@ int RAND_poll(void)
         RAND_add(tmpbuf, sizeof(tmpbuf), sizeof(tmpbuf));
     }
 
-    /* DosQuerySysState() gives us a huge quantity of process, thread, memory & handle stats */
+    /*
+     * DosQuerySysState() gives us a huge quantity of process, thread, memory
+     * & handle stats
+     */
     ULONG buffer_size;
     char *buffer;
     buffer = NULL;
@@ -166,4 +173,4 @@ int RAND_poll(void)
     return 0;
 }
 
-#endif /* OPENSSL_SYS_OS2 */
+#endif                          /* OPENSSL_SYS_OS2 */
