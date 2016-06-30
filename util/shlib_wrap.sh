@@ -69,8 +69,16 @@ SunOS|IRIX*)
 *)	LD_LIBRARY_PATH="${THERE}:$LD_LIBRARY_PATH"	# Linux, ELF HP-UX
 	DYLD_LIBRARY_PATH="${THERE}:$DYLD_LIBRARY_PATH"	# MacOS X
 	SHLIB_PATH="${THERE}:$SHLIB_PATH"		# legacy HP-UX
-	LIBPATH="${THERE}:$LIBPATH"			# AIX, OS/2
+	case "$SYSNAME" in
+	OS/2*)
+	  # OS/2 is a bit special. to have tests running set the BEGINLIBPATH
+	  # in your env !!!
+	  ;;
+	*)
+	LIBPATH="${THERE}:$LIBPATH"			# AIX
 	export LD_LIBRARY_PATH DYLD_LIBRARY_PATH SHLIB_PATH LIBPATH
+	;;
+	esac
 	# Even though $PATH is adjusted [for Windows sake], it doesn't
 	# necessarily does the trick. Trouble is that with introduction
 	# of SafeDllSearchMode in XP/2003 it's more appropriate to copy
