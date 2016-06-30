@@ -301,7 +301,7 @@ fips_premain_dso$(EXE_EXT): libcrypto.a
 		$(FIPSLIBDIR)fips_premain.c $(FIPSLIBDIR)fipscanister.o \
 		libcrypto.a $(EX_LIBS)
 
-libcrypto$(SHLIB_EXT): libcrypto.a fips_premain_dso$(EXE_EXT)
+libcrypto$(SHLIB_EXT): libcrypto.a
 	@if [ "$(SHLIB_TARGET)" != "" ]; then \
 		if [ "$(FIPSCANLIB)" = "libcrypto" ]; then \
 			FIPSLD_LIBCRYPTO=libcrypto.a ; \
