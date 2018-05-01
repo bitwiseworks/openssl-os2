@@ -359,7 +359,7 @@ int main(int Argc, char *ARGV[])
     prog = prog_init();
 
     /* first check the program name */
-    program_name(Argv[0], pname, sizeof pname);
+    program_name(Argv[0], pname, sizeof(pname));
 
     f.name = pname;
     fp = lh_FUNCTION_retrieve(prog, &f);
@@ -387,7 +387,7 @@ int main(int Argc, char *ARGV[])
     for (;;) {
         ret = 0;
         p = buf;
-        n = sizeof buf;
+        n = sizeof(buf);
         i = 0;
         for (;;) {
             p[0] = '\0';
@@ -693,7 +693,7 @@ static LHASH_OF(FUNCTION) *prog_init(void)
 
     /* Purely so it looks nice when the user hits ? */
     for (i = 0, f = functions; f->name != NULL; ++f, ++i) ;
-    qsort(functions, i, sizeof *functions, SortFnByName);
+    qsort(functions, i, sizeof(*functions), SortFnByName);
 
     if ((ret = lh_FUNCTION_new()) == NULL)
         return (NULL);
