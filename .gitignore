@@ -3,8 +3,6 @@
 *.obj
 
 # Top level excludes
-/Makefile
-/Makefile.bak
 /Makefile.save
 /MINFO
 /*.a
@@ -27,6 +25,7 @@
 !/test/r160test.c
 !/test/fips_algvs.c
 !/test/ssltestlib.c
+!/test/x509_time_test.c
 
 # Certificate symbolic links
 *.0
@@ -69,6 +68,5 @@ crypto/sha/asm/sha512-sse2.asm
 /test/evptests.txt
 lib
 Makefile.save
-*.bak
 tags
 TAGS
