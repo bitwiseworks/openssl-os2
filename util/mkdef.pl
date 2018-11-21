@@ -53,6 +53,7 @@
 #   exclude symbols that are part of an algorithm that some user wants to
 #   exclude.
 #
+use POSIX qw(strftime);
 
 my $debug=0;
 
@@ -1316,6 +1317,17 @@ sub print_def_file
 		  # However, they should not have any particular relationship
 		  # to the name of the static library.  Chose descriptive names
 		  # (must be at most 8 chars).
+		  my $vendor;
+		  my $buildhost;
+		  my $builddate = strftime('%d %b %Y %H:%M:%S', gmtime());
+		  if (defined $ENV{'VENDOR'})
+		     { $vendor = $ENV{'VENDOR'}; }
+		  else 
+		     { $vendor = "OPENSSL"; }
+		  if (defined $ENV{'HOSTNAME'})
+		     { $buildhost = $ENV{'HOSTNAME'}; }
+		  else 
+		     { $buildhost = "unknown"; }
 		  my $soname_ssl='emssl';
 		  my $soname_crypto='emcrpt';
 		  my $os2_target="OS2-EMX";
@@ -1339,7 +1351,7 @@ INITINSTANCE TERMINSTANCE
 DATA MULTIPLE NONSHARED
 EOO
 		  # Vendor field can't contain colon, drat; so we omit http://
-		  $description = "\@#OPENSSL:$vernum#\@OpenSSL $version lib$name ($os2_target)";
+		  $description = "\@#".$vendor.":".$version."#\@##1## ".$builddate."     ".$buildhost."::::0::\@\@lib$libname ($os2_target)";
 		}
 
 	print OUT <<"EOF";
@@ -1352,7 +1364,7 @@ LIBRARY         $libname	$liboptions
 EOF
 	if ($OS2) {
 		print <<"EOF";
-DESCRIPTION     '$description'
+DESCRIPTION     "$description"
 
 EOF
 	}
