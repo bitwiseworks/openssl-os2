@@ -370,7 +370,7 @@ extern FILE *_imp___iob;
 #  ifndef R_OK
 #   define R_OK        4
 #  endif
-#  define OPENSSL_CONF  "openssl.cnf"
+#  define OPENSSL_CONF  "openssl10.cnf"
 #  define SSLEAY_CONF   OPENSSL_CONF
 #  define NUL_DEV       "nul"
 #  define RFILE         ".rnd"
@@ -403,7 +403,7 @@ extern FILE *_imp___iob;
 #   else
 #    include <unixlib.h>
 #   endif
-#   define OPENSSL_CONF        "openssl.cnf"
+#   define OPENSSL_CONF        "openssl10.cnf"
 #   define SSLEAY_CONF         OPENSSL_CONF
 #   define RFILE               ".rnd"
 #   define LIST_SEPARATOR_CHAR ','
@@ -453,7 +453,7 @@ extern int kbhit(void);
 #   define _kbhit kbhit
 #   define _O_TEXT O_TEXT
 #   define _O_BINARY O_BINARY
-#   define OPENSSL_CONF   "openssl.cnf"
+#   define OPENSSL_CONF   "openssl10.cnf"
 #   define SSLEAY_CONF    OPENSSL_CONF
 #   define RFILE    ".rnd"
 #   define LIST_SEPARATOR_CHAR ';'
@@ -487,7 +487,7 @@ typedef unsigned long clock_t;
 #    include <fcntl.h>
 #   endif
 
-#   define OPENSSL_CONF        "openssl.cnf"
+#   define OPENSSL_CONF        "openssl10.cnf"
 #   define SSLEAY_CONF         OPENSSL_CONF
 #   define RFILE               ".rnd"
 #   define LIST_SEPARATOR_CHAR ':'
