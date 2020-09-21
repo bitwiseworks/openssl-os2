@@ -41,6 +41,14 @@ IF[{- defined $target{shared_defflag} -}]
 
     SHARED_SOURCE[libcrypto]=libcrypto.map
     SHARED_SOURCE[libssl]=libssl.map
+  ELSIF[{- $config{target} =~ /^os2/ -}]
+    GENERATE[libcrypto.def]=util/mkdef.pl crypto os2
+    DEPEND[libcrypto.def]=util/libcrypto.num
+    GENERATE[libssl.def]=util/mkdef.pl ssl os2
+    DEPEND[libssl.def]=util/libssl.num
+
+    SHARED_SOURCE[libcrypto]=libcrypto.def
+    SHARED_SOURCE[libssl]=libssl.def
   ELSE
     GENERATE[libcrypto.map]=util/mkdef.pl crypto linux
     DEPEND[libcrypto.map]=util/libcrypto.num
@@ -88,6 +96,9 @@ ELSIF[{- $config{target} =~ /^mingw/ -}]
 ELSIF[{- $config{target} =~ /^VC-/ -}]
  SHARED_NAME[libcrypto]=libcrypto-{- $sover_filename -}{- $target{multilib} -}
  SHARED_NAME[libssl]=libssl-{- $sover_filename -}{- $target{multilib} -}
+ELSIF[{- $config{target} =~ /^os2/ -}]
+ SHARED_NAME[libcrypto]=crypto
+ SHARED_NAME[libssl]=ssl
 ENDIF
 
 # VMS has a cultural standard where all libraries are prefixed.
