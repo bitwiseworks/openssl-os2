@@ -40,6 +40,8 @@
      # libcrypto.a and use libcrypto_a.a as static one.
      sub sharedaix  { !$disabled{shared} && $config{target} =~ /^aix/ }
 
+     sub os2dll  { !$disabled{shared} && $config{target} =~ /^os2/ }
+
      our $sover_dirname = $config{shlib_version_number};
      $sover_dirname =~ s|\.|_|g
          if $config{target} =~ /^mingw/;
@@ -626,12 +628,12 @@ install_dev: install_runtime_libs
 		s2=`echo "$$s" | cut -f2 -d";"`; \
 		fn1=`basename $$s1`; \
 		fn2=`basename $$s2`; \
-		: {- output_off(); output_on() unless windowsdll() or sharedaix(); "" -}; \
+		: {- output_off(); output_on() unless windowsdll() or sharedaix() or os2dll(); "" -}; \
 		if [ "$$fn1" != "$$fn2" ]; then \
 			$(ECHO) "link $(DESTDIR)$(libdir)/$$fn2 -> $(DESTDIR)$(libdir)/$$fn1"; \
 			ln -sf $$fn1 "$(DESTDIR)$(libdir)/$$fn2"; \
 		fi; \
-		: {- output_off() unless windowsdll() or sharedaix(); output_on() if windowsdll(); "" -}; \
+		: {- output_off() unless windowsdll() or sharedaix() or os2dll(); output_on() if windowsdll(); "" -}; \
 		$(ECHO) "install $$s2 -> $(DESTDIR)$(libdir)/$$fn2"; \
 		cp $$s2 "$(DESTDIR)$(libdir)/$$fn2.new"; \
 		chmod 755 "$(DESTDIR)$(libdir)/$$fn2.new"; \
@@ -1215,6 +1217,12 @@ EOF
           $recipe .= <<"EOF";
 	rm -f $simple && \\
 	\$(AR) r $simple $full
+EOF
+      } elsif (os2dll()) {
+          $recipe .= <<"EOF";
+	rm -f $lib\$(SHLIB_EXT_IMPORT) && \\
+	emximp -o $lib\$(SHLIB_EXT_IMPORT) $shlib\$(SHLIB_EXT)
+INSTALL_SHLIBS += $lib\$(SHLIB_EXT_IMPORT)
 EOF
       } else {
           $recipe .= <<"EOF";

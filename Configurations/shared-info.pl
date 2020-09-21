@@ -79,4 +79,7 @@ my %shared_info;
             shared_sonameflag => '-h ',
         };
     },
+    'os2-shared' => {
+        shared_defflag        => '',
+    },
 );

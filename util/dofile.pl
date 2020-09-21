@@ -17,6 +17,7 @@ use warnings;
 use FindBin;
 use Getopt::Std;
 
+use configdata;
 # We actually expect to get the following hash tables from configdata:
 #
 #    %config
