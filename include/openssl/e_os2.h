@@ -112,8 +112,7 @@ extern "C" {
 # endif
 
 /* --------------------------------- OS/2 ---------------------------------- */
-# if defined(__EMX__) || defined(__OS2__) || defined(__KLIBC__)
-#  undef OPENSSL_SYS_UNIX
+# if defined(__OS2__) && !defined(OPENSSL_SYS_OS2)
 #  define OPENSSL_SYS_OS2
 # endif
 
