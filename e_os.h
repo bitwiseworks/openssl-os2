@@ -235,6 +235,11 @@ extern FILE *_imp___iob;
 
 # else                          /* The non-microsoft world */
 
+# if defined(OPENSSL_SYS_OS2x)
+#  undef DEVRANDOM_EGD  
+#  undef DEVRANDOM
+# endif
+
 #  if defined(OPENSSL_SYS_VXWORKS)
 #   include <sys/times.h>
 #  else
@@ -351,6 +356,7 @@ struct servent *getservbyname(const char *name, const char *proto);
 
 /* unistd.h defines _POSIX_VERSION */
 # if !defined(OPENSSL_NO_SECURE_MEMORY) && defined(OPENSSL_SYS_UNIX) \
+     && !defined(OPENSSL_SYS_OS2) \
      && ( (defined(_POSIX_VERSION) && _POSIX_VERSION >= 200112L)      \
           || defined(__sun) || defined(__hpux) || defined(__sgi)      \
           || defined(__osf__) )

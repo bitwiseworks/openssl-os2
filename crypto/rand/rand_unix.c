@@ -213,7 +213,7 @@ void rand_pool_keep_random_devices_open(int keep)
 #   error "Seeding uses urandom but DEVRANDOM is not configured"
 #  endif
 
-#  if defined(OPENSSL_RAND_SEED_OS)
+#  if defined(OPENSSL_RAND_SEED_OS) && !defined(OPENSSL_SYS_OS2x)
 #   if !defined(DEVRANDOM)
 #    error "OS seeding requires DEVRANDOM to be configured"
 #   endif
@@ -391,6 +391,18 @@ static ssize_t syscall_random(void *buf, size_t buflen)
     return syscall(__NR_getrandom, buf, buflen, 0);
 #  elif (defined(__FreeBSD__) || defined(__NetBSD__)) && defined(KERN_ARND)
     return sysctl_random(buf, buflen);
+#  elif defined(OPENSSL_SYS_OS2)
+    int i;
+    char *buf2 = buf;
+    for (i = 0; i < buflen;) {
+        unsigned long ul = (unsigned long)random();
+        *buf2++ = (unsigned char)(ul);
+        i++;
+        if (i <= buflen)
+          *buf2++ = (unsigned char)(ul >> 8);
+        i++;
+    }
+    return (ssize_t)buflen;
 #  else
     errno = ENOSYS;
     return -1;
@@ -702,6 +714,7 @@ size_t rand_pool_acquire_entropy(RAND_POOL *pool)
 
 #   if defined(OPENSSL_RAND_SEED_RDCPU)
     entropy_available = rand_acquire_entropy_from_cpu(pool);
+printf("bww trace \n");
     if (entropy_available > 0)
         return entropy_available;
 #   endif
