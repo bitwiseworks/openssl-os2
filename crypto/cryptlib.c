@@ -16,7 +16,11 @@
         defined(__x86_64) || defined(__x86_64__) || \
         defined(_M_AMD64) || defined(_M_X64)
 
+# if defined(OPENSSL_SYS_OS2)
+unsigned int OPENSSL_ia32cap_P[4];
+# else
 extern unsigned int OPENSSL_ia32cap_P[4];
+# endif
 
 # if defined(OPENSSL_CPUID_OBJ) && !defined(OPENSSL_NO_ASM) && !defined(I386_ONLY)
 

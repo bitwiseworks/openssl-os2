@@ -31,6 +31,7 @@
 #include <openssl/err.h>
 
 #if defined(OPENSSL_SYS_OS2)
+# include <io.h>
 # include <fcntl.h>
 #endif
 
