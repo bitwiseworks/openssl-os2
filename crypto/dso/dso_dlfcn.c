@@ -30,7 +30,7 @@
 #  if defined(__SCO_VERSION__) || defined(_SCO_ELF) || \
      (defined(__osf__) && !defined(RTLD_NEXT))     || \
      (defined(__OpenBSD__) && !defined(RTLD_SELF)) || \
-        defined(__ANDROID__)
+        defined(__ANDROID__) || defined(OPENSSL_SYS_OS2)
 #   undef HAVE_DLINFO
 #  endif
 # endif
@@ -184,6 +184,13 @@ static DSO_FUNC_TYPE dlfcn_bind_func(DSO *dso, const char *symname)
         return NULL;
     }
     u.dlret = dlsym(ptr, symname);
+#ifdef OPENSSL_SYS_OS2
+    if (u.dlret == NULL) {
+       char symname2[256];
+       snprintf(symname2, sizeof(symname2), "_%s", symname);
+       u.dlret = dlsym(ptr, symname2);
+    }
+#endif
     if (u.dlret == NULL) {
         DSOerr(DSO_F_DLFCN_BIND_FUNC, DSO_R_SYM_FAILURE);
         ERR_add_error_data(4, "symname(", symname, "): ", dlerror());
@@ -448,6 +455,13 @@ static void *dlfcn_globallookup(const char *name)
 
     if (handle) {
         ret = dlsym(handle, name);
+#ifdef OPENSSL_SYS_OS2
+        if (ret == NULL) {
+           char name2[256];
+           snprintf(name2, sizeof(name2), "_%s", name);
+           ret = dlsym(handle, name2);
+        }
+#endif
         dlclose(handle);
     }
 

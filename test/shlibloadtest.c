@@ -62,7 +62,15 @@ static int shlib_load(const char *filename, SHLIB *lib)
 
 static int shlib_sym(SHLIB lib, const char *symname, SHLIB_SYM *sym)
 {
+
     *sym = dlsym(lib, symname);
+#ifdef OPENSSL_SYS_OS2
+    if (*sym == NULL) {
+       char symname2[256];
+       snprintf(symname2, sizeof(symname2), "_%s", symname);
+       *sym = dlsym(lib, symname2);
+    }
+#endif
     return *sym != NULL;
 }
 
@@ -219,7 +227,7 @@ static int test_lib(void)
     }
 
     if (test_type == DSO_REFTEST) {
-# ifdef DSO_DLFCN
+# if defined(DSO_DLFCN) && !defined(OPENSSL_SYS_OS2)
         DSO_dsobyaddr_t myDSO_dsobyaddr;
         DSO_free_t myDSO_free;
 
