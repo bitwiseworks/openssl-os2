@@ -126,7 +126,6 @@ my $VMS=0;
 my $W32=0;
 my $NT=0;
 my $OS2=0;
-my $KNIX=0;
 my $UNIX=0;
 my $linux=0;
 my $aix=0;
@@ -183,10 +182,7 @@ foreach (@ARGV, split(/ /, $config{options}))
 		$UNIX=1;
 	} elsif ($_ eq "VMS") {
 		$VMS=1;
-	} elsif ($_ eq "OS2-KNIX") {
-		$KNIX=1;
-		$OS2=1;
-	} elsif ($_ eq "OS2" || $_ eq "OS2-EMX") {
+	} elsif ($_ eq "os2") {
 		$OS2=1;
 	}
 	if ($_ eq "zlib" || $_ eq "enable-zlib" || $_ eq "zlib-dynamic"
@@ -216,11 +212,11 @@ if (!$libname) {
 }
 
 # If no platform is given, assume WIN32
-if ($W32 + $VMS + $linux + $aix == 0) {
+if ($W32 + $VMS + $linux + $aix + $OS2 == 0) {
 	$W32 = 1;
 }
 die "Please, only one platform at a time"
-    if ($W32 + $VMS + $linux + $aix > 1);
+    if ($W32 + $VMS + $linux + $aix + $OS2 > 1);
 
 if (!$do_ssl && !$do_crypto)
 	{
@@ -1186,17 +1182,11 @@ EOF
 		   { $buildhost = $ENV{'HOSTNAME'}; }
 		else 
 		   { $buildhost = "unknown"; }
-		my $soname_ssl='emssl';
-		my $soname_crypto='emcrpt';
-		my $os2_target="OS2-EMX";
+		my $soname_ssl='ssl';
+		my $soname_crypto='crypto';
+		my $os2_target="os2";
 		my $vernum = $version;
 		$vernum = $1 if $version =~ /([\d\.]*)/;
-		if ($KNIX)
-		   {
-		   $soname_ssl='ssl';
-		   $soname_crypto='crypto';
-		   $os2_target="OS2-KNIX";
-		   }
 		if ($vernum =~ /^(\d\d*)\.(\d\d*)/)
 		  {
 		  $soname_crypto .= $1 . $2;
@@ -1327,11 +1317,12 @@ EOF
 					} elsif($v && !$OS2) {
 						printf OUT "    %s%-39s DATA\n",
 								($W32)?"":"_",$s2;
-					} elsif ($KNIX) {
+					} elsif ($OS2) {
 						printf OUT "    _%s\n",$s2;
 					} else {
 						printf OUT "    %s%s\n",
-								(($W32||$OS2)&&!$KNIX)?"":"_",$s2;
+								($W32)?"":"_",$s2;
+					}
 				}
 			}
 		}
