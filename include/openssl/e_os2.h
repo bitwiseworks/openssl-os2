@@ -172,6 +172,9 @@ extern "C" {
 # if defined(OPENSSL_SYS_WINDOWS) && defined(OPENSSL_OPT_WINDLL)
 #  define OPENSSL_EXPORT extern __declspec(dllexport)
 #  define OPENSSL_EXTERN extern __declspec(dllimport)
+# elif defined(OPENSSL_SYS_OS2)
+#  define OPENSSL_EXPORT extern __declspec(dllexport)
+#  define OPENSSL_EXTERN extern 
 # else
 #  define OPENSSL_EXPORT extern
 #  define OPENSSL_EXTERN extern
