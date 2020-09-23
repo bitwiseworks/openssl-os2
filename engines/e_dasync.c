@@ -33,6 +33,10 @@
 # undef ASYNC_WIN
 # define ASYNC_WIN
 #endif
+#if defined(OPENSSL_SYS_OS2)
+# include <sys/socket.h>
+# define pipe(A) socketpair(AF_UNIX, SOCK_STREAM, 0, A)
+#endif
 
 #include "e_dasync_err.c"
 
