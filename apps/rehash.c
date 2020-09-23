@@ -315,7 +315,7 @@ static int ends_with_dirsep(const char *path)
 # if defined __VMS
     if (*path == ']' || *path == '>' || *path == ':')
         return 1;
-# elif defined _WIN32
+# elif defined(_WIN32) || defined(OPENSSL_SYS_OS2)
     if (*path == '\\')
         return 1;
 # endif

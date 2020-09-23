@@ -795,7 +795,7 @@ static OSSL_STORE_LOADER_CTX *file_open(const OSSL_STORE_LOADER *loader,
         }
 
         path_data[path_data_n].check_absolute = 1;
-#ifdef _WIN32
+#if defined(_WIN32) || defined(OPENSSL_SYS_OS2)
         /* Windows file: URIs with a drive letter start with a / */
         if (p[0] == '/' && p[2] == ':' && p[3] == '/') {
             char c = ossl_tolower(p[1]);
@@ -1150,7 +1150,7 @@ static int ends_with_dirsep(const char *uri)
 #if defined __VMS
     if (*uri == ']' || *uri == '>' || *uri == ':')
         return 1;
-#elif defined _WIN32
+#elif defined(_WIN32) || defined(OPENSSL_SYS_OS2)
     if (*uri == '\\')
         return 1;
 #endif
