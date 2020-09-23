@@ -32,31 +32,52 @@ plan tests => 10;
 
 my $libcrypto = bldtop_file(shlib('libcrypto'));
 my $libssl = bldtop_file(shlib('libssl'));
+my $os2 = config('target') =~ m|^os2|;
 
 (my $fh, my $filename) = tempfile();
 ok(run(test(["shlibloadtest", "-crypto_first", $libcrypto, $libssl, $filename])),
    "running shlibloadtest -crypto_first $filename");
+SKIP:
+{
+skip "check_atexit disabled on OS/2", 1 if $os2;
 ok(check_atexit($fh));
+}
 unlink $filename;
 ($fh, $filename) = tempfile();
 ok(run(test(["shlibloadtest", "-ssl_first", $libcrypto, $libssl, $filename])),
    "running shlibloadtest -ssl_first $filename");
+SKIP:
+{
+skip "check_atexit disabled on OS/2", 1 if $os2;
 ok(check_atexit($fh));
+}
 unlink $filename;
 ($fh, $filename) = tempfile();
 ok(run(test(["shlibloadtest", "-just_crypto", $libcrypto, $libssl, $filename])),
    "running shlibloadtest -just_crypto $filename");
+SKIP:
+{
+skip "check_atexit disabled on OS/2", 1 if $os2;
 ok(check_atexit($fh));
+}
 unlink $filename;
 ($fh, $filename) = tempfile();
 ok(run(test(["shlibloadtest", "-dso_ref", $libcrypto, $libssl, $filename])),
    "running shlibloadtest -dso_ref $filename");
+SKIP:
+{
+skip "check_atexit disabled on OS/2", 1 if $os2;
 ok(check_atexit($fh));
+}
 unlink $filename;
 ($fh, $filename) = tempfile();
 ok(run(test(["shlibloadtest", "-no_atexit", $libcrypto, $libssl, $filename])),
    "running shlibloadtest -no_atexit $filename");
+SKIP:
+{
+skip "check_atexit disabled on OS/2", 1 if $os2;
 ok(!check_atexit($fh));
+}
 unlink $filename;
 
 sub shlib {
@@ -68,6 +89,10 @@ sub shlib {
         . ($target{shared_extension} || ".so");
     $lib =~ s|\.\$\(SHLIB_VERSION_NUMBER\)
              |.$config{shlib_version_number}|x;
+    $lib =~ s|\$\(SHLIB_MAJOR\)
+             |$config{shlib_major}|x;
+    $lib =~ s|\$\(SHLIB_MINOR\)
+             |$config{shlib_minor}|x;
     return $lib;
 }
 
