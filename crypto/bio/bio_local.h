@@ -11,6 +11,10 @@
 #include "internal/sockets.h"
 #include "internal/refcount.h"
 
+#ifdef OPENSSL_SYS_OS2
+#include <libcx/net.h>
+#endif
+
 /* BEGIN BIO_ADDRINFO/BIO_ADDR stuff. */
 
 #ifndef OPENSSL_NO_SOCK
