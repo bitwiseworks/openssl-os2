@@ -347,6 +347,12 @@ sub writer_os2 {
 
     my %translate = (libssl => $soname_ssl, libcrypto => $soname_crypto);
     $libname = $translate{$name} || $name;
+    # if libname has a /, we only need the part after the last / as libname
+    my $index = rindex($libname, "/");
+    if ($index != -1)
+    {
+        $libname = substr $libname, $index +1;
+    }
     # Vendor field can't contain colon
     my $description = "\@#".$vendor.":".$version."#\@##1## ".$builddate."     ".$buildhost."::::0::\@\@$name ($os2_target)";
     print <<"_____";
