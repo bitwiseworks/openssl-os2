@@ -25,7 +25,7 @@ sub shlibextimport      { $target{shared_import_extension} || '_dll.a' }
 sub shlibextsimple      { undef }
 sub makedepcmd          { $disabled{makedepend} ? undef : $config{makedepcmd} }
 
-(my $sover_filename = $config{major} . $config{minor}) =~ s|\.|_|g;
+(my $sover_filename = $config{shlib_version}) =~ s|\.|_|g;
 sub shlib_version_as_filename {
     return $sover_filename;
 }

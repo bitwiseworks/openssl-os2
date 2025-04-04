@@ -337,13 +337,15 @@ sub writer_os2 {
     my $soname_ssl='ssl';
     my $soname_crypto='crypto';
     my $os2_target="os2";
-    my $vernum = $version;
-    $vernum = $1 if $version =~ /([\d\.]*)/;
-    if ($vernum =~ /^(\d\d*)\.(\d\d*)/)
-    {
-        $soname_crypto .= $1 . $2;
-        $soname_ssl .= $1 . $2;
-    }
+    my $os2_version = undef;
+    if (defined $version)
+        { $os2_version = $version; }
+    else
+        { $os2_version = $config{version}; }
+
+    $os2_version =~ /^(\d+)\.(\d+)\.(\d+)/;
+    $soname_crypto .= $1;
+    $soname_ssl .= $1;
 
     my %translate = (libssl => $soname_ssl, libcrypto => $soname_crypto);
     $libname = $translate{$name} || $name;
@@ -354,7 +356,7 @@ sub writer_os2 {
         $libname = substr $libname, $index +1;
     }
     # Vendor field can't contain colon
-    my $description = "\@#".$vendor.":".$version."#\@##1## ".$builddate."     ".$buildhost."::::0::\@\@$name ($os2_target)";
+    my $description = "\@#".$vendor.":".$os2_version."#\@##1## ".$builddate."     ".$buildhost."::::0::\@\@$name ($os2_target)";
     print <<"_____";
 ;
 ; Definition file for the DLL version of the $libname library from OpenSSL
