@@ -344,11 +344,7 @@ sub writer_os2 {
         { $os2_version = $config{version}; }
 
     $os2_version =~ /^(\d+)\.(\d+)\.(\d+)/;
-    $soname_crypto .= $1;
-    $soname_ssl .= $1;
 
-    my %translate = (libssl => $soname_ssl, libcrypto => $soname_crypto);
-    $libname = $translate{$name} || $name;
     # if libname has a /, we only need the part after the last / as libname
     my $index = rindex($libname, "/");
     if ($index != -1)

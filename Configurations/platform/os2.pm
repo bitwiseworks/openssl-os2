@@ -32,11 +32,12 @@ sub shlib_version_as_filename {
 sub sharedname {
     my $lib = platform::BASE->sharedname($_[1]);
     $lib =~ s|^lib|| if defined $lib;
+    $lib = 'O' . $lib if defined $lib and $lib eq 'ssl';
     return platform::BASE::__concat($lib,
                                     $_[0]->shlib_version_as_filename());
 }
 
-# With Mingw and other DLL producers, there isn't any "simpler" shared
+# With OS/2, there isn't any "simpler" shared
 # library name.  However, there is a static import library.
 sub sharedlib_simple {
     return undef;
