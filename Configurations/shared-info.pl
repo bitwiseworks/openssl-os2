@@ -55,6 +55,9 @@ my %shared_info;
         shared_ldflag         => '-shared -Wl,--enable-auto-image-base',
         shared_impflag        => '-Wl,--out-implib=',
     },
+    'os2-shared' => {
+        shared_defflag    => '',
+    },
     'mingw-shared' => sub {
         return {
             %{$shared_info{'cygwin-shared'}},
@@ -63,8 +66,6 @@ my %shared_info;
             shared_defflag    => '',
             shared_argfileflag => '@',
         };
-    'os2-shared' => {
-        shared_defflag    => '',
     },
     'alpha-osf1-shared' => sub {
         return $shared_info{'gnu-shared'} if detect_gnu_ld();
