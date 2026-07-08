@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2015-2025 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2015-2026 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -52,7 +52,7 @@ my ($no_des, $no_dh, $no_dsa, $no_ec, $no_ec2m, $no_rc2, $no_zlib)
 
 $no_rc2 = 1 if disabled("legacy");
 
-plan tests => 26;
+plan tests => 32;
 
 ok(run(test(["pkcs7_test"])), "test pkcs7");
 
@@ -83,6 +83,15 @@ my @smime_pkcs7_tests = (
         "-certfile", $smroot, "-signer", $smrsa1, "-out", "{output}.cms" ],
       [ "{cmd2}",  @prov, "-verify", "-in", "{output}.cms", "-inform", "DER",
         "-CAfile", $smroot, "-out", "{output}.txt" ],
+      \&final_compare
+    ],
+
+    [ "signed text content DER format, RSA key",
+      [ "{cmd1}", @prov, "-sign", "-in", $smcont, "-outform", "DER", "-nodetach",
+        "-certfile", $smroot, "-signer", $smrsa1, "-text",
+        "-out", "{output}.cms" ],
+      [ "{cmd2}",  @prov, "-verify", "-in", "{output}.cms", "-inform", "DER",
+        "-text", "-CAfile", $smroot, "-out", "{output}.txt" ],
       \&final_compare
     ],
 
@@ -219,6 +228,14 @@ my @smime_pkcs7_tests = (
       \&final_compare
     ],
 
+    [ "enveloped text content streaming S/MIME format, DES, 1 recipient",
+      [ "{cmd1}", @defaultprov, "-encrypt", "-in", $smcont,
+        "-stream", "-text", "-out", "{output}.cms", $smrsa1 ],
+      [ "{cmd2}", @defaultprov, "-decrypt", "-recip", $smrsa1,
+        "-in", "{output}.cms", "-text", "-out", "{output}.txt" ],
+      \&final_compare
+    ],
+
     [ "enveloped content test streaming S/MIME format, DES, 3 recipients, 3rd used",
       [ "{cmd1}", @defaultprov, "-encrypt", "-in", $smcont,
         "-stream", "-out", "{output}.cms",
@@ -351,6 +368,16 @@ my @smime_cms_tests = (
       [ "{cmd2}", @prov, "-decrypt", "-in", "{output}.cms", "-out", "{output}.txt",
         "-inform", "PEM",
         "-secretkey", "000102030405060708090A0B0C0D0E0F" ],
+      \&final_compare
+    ],
+
+    [ "enveloped content test streaming PEM format, AES-128-CBC cipher, password",
+      [ "{cmd1}", @prov, "-encrypt", "-in", $smcont, "-outform", "PEM", "-aes128",
+        "-stream", "-out", "{output}.cms",
+        "-pwri_password", "test" ],
+      [ "{cmd2}", @prov, "-decrypt", "-in", "{output}.cms", "-out", "{output}.txt",
+        "-inform", "PEM",
+        "-pwri_password", "test" ],
       \&final_compare
     ],
 
@@ -1177,6 +1204,23 @@ subtest "CMS code signing test" => sub {
        "fail verify CMS signature with code signing certificate for purpose smime_sign");
 };
 
+# Regression test for PKCS7_verify() ownership handling when
+# digestAlgorithms is an empty SET.
+# The malformed structure must fail cleanly without crashing or
+# triggering use-after-free behaviour.
+with({ exit_checker => sub { return shift == 4; } },
+    sub {
+        ok(run(app([
+                'openssl', 'smime',
+                '-verify',
+                '-noverify',
+                '-in',
+                srctop_file('test', 'smime-eml',
+                            'pkcs7-empty-digest-set.eml'),
+            ])),
+           "Check empty digestAlgorithms SET is handled safely");
+    });
+
 # Test case for missing MD algorithm (must not segfault)
 
 with({ exit_checker => sub { return shift == 4; } },
@@ -1227,6 +1271,16 @@ ok(!run(app(['openssl', 'cms', '-verify',
                                 "SignedInvalidMappingFromanyPolicyTest7.eml")
             ])),
    "issue#19643");
+
+# Check that users get error when using incorrect envelope type for AEAD algorithms
+ok(!run(app(['openssl', 'cms', '-decrypt',
+             '-inform', 'PEM', '-stream',
+             '-secretkey', '000102030405060708090A0B0C0D0E0F',
+             '-secretkeyid', 'C0FEE0',
+             '-in', srctop_file("test/cms-msg",
+                                "enveloped-content-type-for-aes-gcm.pem")
+            ])),
+   "Error AES-GCM in enveloped content type");
 
 # Check that kari encryption with originator does not segfault
 with({ exit_checker => sub { return shift == 3; } },
@@ -1280,6 +1334,49 @@ with({ exit_checker => sub { return shift == 3; } },
 	   "Check for failure when cipher does not have an assigned OID (issue#22225)");
      });
 
+# Test cases for CVE-2026-28389
+my $smcont_malformed = srctop_file("test", "recipes", "80-test_cms_data", "dh-malformed.der");
+my $smdhcert = srctop_file("test", "recipes", "80-test_cms_data", "dh-cert.pem");
+my $smdhkey = srctop_file("test", "recipes", "80-test_cms_data", "dh-key.pem");
+
+with({ exit_checker => sub { return shift == 4; } },
+    sub {
+        SKIP: {
+          skip "DH is not supported in this build", 1 if $no_dh;
+
+          ok(run(app(["openssl", "cms", @prov, "-decrypt", "-in", $smcont_malformed,
+                      "-inform", "DER", "-recip", $smdhcert, "-inkey", $smdhkey])),
+             "Must not crash on malformed cms inputs with dh key");
+        }
+    });
+
+$smcont_malformed = srctop_file("test", "recipes", "80-test_cms_data", "ecdh-malformed.der");
+my $smecdhcert = srctop_file("test", "recipes", "80-test_cms_data", "ecdh-cert.pem");
+my $smecdhkey = srctop_file("test", "recipes", "80-test_cms_data", "ecdh-key.pem");
+
+with({ exit_checker => sub { return shift == 4; } },
+    sub {
+        SKIP: {
+          skip "EC is not supported in this build", 1 if $no_ec;
+
+          ok(run(app(["openssl", "cms", @prov, "-decrypt", "-in", $smcont_malformed,
+                       "-inform", "DER", "-recip", $smecdhcert, "-inkey", $smecdhkey])),
+             "Must not crash on malformed cms inputs with ecdh key");
+        }
+    });
+
+$smcont_malformed = srctop_file("test", "recipes", "80-test_cms_data", "rsa-malformed.der");
+my $smrsacert = catfile($smdir, "smrsa3.pem");
+my $smrsakey = catfile($smdir, "smrsa3-key.pem");
+
+# Test case for CVE-2026-28390
+with({ exit_checker => sub { my $ret = shift; return $ret == 4 || $ret == 0; } },
+    sub {
+        ok(run(app(["openssl", "cms", @prov, "-decrypt", "-in", $smcont_malformed, "-inform",
+                   "DER", "-recip", $smrsacert, "-inkey", $smrsakey, "-out", "{output}.cms"])),
+           "Must not crash on malformed cms inputs with RSA key");
+    });
+
 # Test encrypt to three recipients, and decrypt using key-only;
 # i.e. do not follow the recommended practice of providing the
 # recipient cert in the decrypt op.
@@ -1326,4 +1423,22 @@ subtest "encrypt to three recipients with RSA-OAEP, key only decrypt" => sub {
 	       ])),
        "decrypt with key only");
     is(compare($pt, $ptpt), 0, "compare original message with decrypted ciphertext");
+};
+
+# Regression test for NULL dereference in PWRI decrypt path
+# when optional keyDerivationAlgorithm is omitted.
+subtest "PWRI missing keyDerivationAlgorithm regression" => sub {
+    plan tests => 1;
+
+    with({ exit_checker => sub { return shift == 4; } }, sub {
+        ok(run(app([
+            "openssl", "cms", @prov,
+            "-decrypt",
+            "-inform", "DER",
+            "-in",
+            srctop_file('test', 'cms-msg', 'missing-kdf.der'),
+            "-out", "pwri-out.txt",
+            "-pwri_password", "secret"])),
+        "missing keyDerivationAlgorithm is rejected");
+    });
 };

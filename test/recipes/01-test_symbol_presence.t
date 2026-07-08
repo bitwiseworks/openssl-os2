@@ -24,7 +24,10 @@ use platform;
 plan skip_all => "Test is disabled on NonStop" if config('target') =~ m|^nonstop|;
 # MacOS arranges symbol names differently
 plan skip_all => "Test is disabled on MacOS" if config('target') =~ m|^darwin|;
+# OS/2 reports symbol names differently
 plan skip_all => "Test is disabled on OS/2" if config('target') =~ m|^os2|;
+# AIX reports symbol names differently
+plan skip_all => "Test is disabled on AIX" if config('target') =~ m|^aix|;
 plan skip_all => "This is unsupported on platforms that don't have 'nm'"
     unless IPC::Cmd::can_run('nm');
 
